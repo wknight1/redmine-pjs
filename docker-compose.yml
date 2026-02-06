@@ -6,9 +6,9 @@ services:
     environment:
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
-      # 변수 미설정 시 배포를 중단하여 보안 사고 예방
-      - REDMINE_DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD를 입력해주세요}
-      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY:?REDMINE_SECRET_KEY를 입력해주세요}
+      # Easypanel Environment 탭에 설정된 변수를 직접 주입합니다.
+      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
+      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
@@ -26,7 +26,7 @@ services:
       - redmine_pjs_net
     environment:
       - POSTGRES_DB=redmine
-      - POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD를 입력해주세요}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
     restart: always
