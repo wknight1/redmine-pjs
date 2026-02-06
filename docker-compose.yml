@@ -5,19 +5,27 @@ services:
       dockerfile: Dockerfile
       target: application
     environment:
+      # [1. DB 연결 설정]
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
-      - REDMINE_DB_USERNAME=redmine
-      # ★ [보안] Easypanel에 등록된 DB_PASSWORD 변수를 사용
+      - REDMINE_DB_USERNAME=redmine  # ★ 필수: 이 부분이 없어서 postgres 유저로 접속 시도함
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
-      # ★ [보안] Easypanel에 등록된 REDMINE_SECRET_KEY_BASE 변수를 사용
+      
+      # [2. 보안 키 설정 - 이중 매핑]
+      # Redmine 전용 변수
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
+      # Rails 표준 변수 (Redmine이 놓쳐도 Rails가 잡도록 함)
+      - SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
+      
+      # [3. 기타 설정]
       - TZ=Asia/Seoul
+      - RAILS_ENV=production
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
-    # [실행 파이프라인] 마이그레이션 -> UI 주입 -> 서버 시작
+    # [4. 실행 파이프라인]
+    # UI 자동 주입 스크립트 실행 후 서버 가동
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
@@ -39,11 +47,10 @@ services:
     environment:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
-      # ★ [보안] 앱과 동일한 DB_PASSWORD 변수를 사용 (동기화 불필요)
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # [성능] 한국어 ICU 정렬 및 로케일 최적화
+      # [한글 최적화] ICU 로케일 강제 지정
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
-    # [튜닝] KBS 프로덕션 환경에 맞춘 DB 파라미터
+    # [튜닝]
     command: >
       postgres 
       -c shared_buffers=512MB 
