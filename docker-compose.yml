@@ -11,7 +11,6 @@ services:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
-    # [실행 파이프라인] 마이그레이션 -> UI 디자인 주입 -> 서버 실행
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
@@ -20,10 +19,6 @@ services:
       db:
         condition: service_healthy
     restart: always
-    deploy:
-      resources:
-        limits:
-          memory: 2G
 
   db:
     image: postgres:18.1
@@ -42,12 +37,6 @@ services:
       timeout: 5s
       retries: 5
     restart: always
-
-volumes:
-  db_data:
-  redmine_files:
-  redmine_plugins:
-  redmine_themes:
 
 networks:
   default:
