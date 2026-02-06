@@ -1,45 +1,37 @@
 services:
   redmine:
     build: .
-    networks:
-      - redmine_pjs_net
     environment:
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
-      # Redis를 세션/캐시 저장소로 사용하여 성능 향상
-      - REDMINE_REDIS_URL=redis://redis:6379/0
       - TZ=Asia/Seoul
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
+    # [실행 파이프라인] 마이그레이션 -> UI 디자인 주입 -> 서버 실행
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
+             bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
              /docker-entrypoint.sh rails server -b 0.0.0.0"
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
     restart: always
     deploy:
       resources:
         limits:
-          memory: 2G # 팀 규모에 맞춘 권장 메모리
+          memory: 2G
 
   db:
     image: postgres:18.1
-    networks:
-      - redmine_pjs_net
     environment:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # [DB 최적화 설정]
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko-KR --lc-ctype=ko-KR
-      - TZ=Asia/Seoul
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko-KR --lc-ctype=ko-KR --set=default_text_search_config=pg_catalog.simple
     command: >
       postgres -c shared_buffers=512MB -c work_mem=16MB -c max_connections=200
     volumes:
@@ -51,18 +43,12 @@ services:
       retries: 5
     restart: always
 
-  redis:
-    image: redis:7-alpine
-    networks:
-      - redmine_pjs_net
-    restart: always
-
-networks:
-  redmine_pjs_net:
-    driver: bridge
-
 volumes:
   db_data:
   redmine_files:
   redmine_plugins:
   redmine_themes:
+
+networks:
+  default:
+    name: redmine_pjs_net
