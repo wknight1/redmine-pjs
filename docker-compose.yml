@@ -7,8 +7,8 @@ services:
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
       # Easypanel Environment 탭에 설정된 변수를 그대로 가져옵니다.
-      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
-      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
+      - REDMINE_DB_PASSWORD="${DB_PASSWORD}"
+      - REDMINE_SECRET_KEY_BASE="${REDMINE_SECRET_KEY}"
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
@@ -27,7 +27,7 @@ services:
       - redmine_pjs_net
     environment:
       - POSTGRES_DB=redmine
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_PASSWORD="${DB_PASSWORD}"
     volumes:
       - db_data:/var/lib/postgresql/data
     restart: always
