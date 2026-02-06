@@ -7,8 +7,8 @@ services: # version: '3.8' 라인은 삭제했습니다.
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
       # 변수가 없을 경우 에러를 내도록 :? 구문을 추가하면 디버깅이 쉽습니다.
-      - REDMINE_DB_PASSWORD=${DB_PASSWORD:?database password not set}
-      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY:?secret key not set}
+      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
+      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
@@ -26,7 +26,7 @@ services: # version: '3.8' 라인은 삭제했습니다.
       - redmine_pjs_net
     environment:
       - POSTGRES_DB=redmine
-      - POSTGRES_PASSWORD=${DB_PASSWORD:?database password not set}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
     restart: always
