@@ -29,8 +29,8 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # Postgres 18 대응 최신 로케일 설정 (ICU 사용)
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR
+      # 한글 검색 최적화: --icu-locale 및 simple search 설정
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --set=default_text_search_config=pg_catalog.simple
       - TZ=Asia/Seoul
     volumes:
       - db_data:/var/lib/postgresql
