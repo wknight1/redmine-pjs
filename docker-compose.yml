@@ -14,7 +14,6 @@ services:
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
     # [한글 완전 정복 파이프라인]
-    # 1. 마이그레이션 -> 2. 한글 검색용 Trgm 확장 설치 -> 3. UI 자동설정 -> 4. 서버 시작
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              bundle exec rails runner \"ActiveRecord::Base.connection.execute('CREATE EXTENSION IF NOT EXISTS pg_trgm')\" -e production &&
@@ -24,6 +23,10 @@ services:
       db:
         condition: service_healthy
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   db:
     build:
