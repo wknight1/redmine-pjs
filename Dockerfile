@@ -1,9 +1,9 @@
 # ==============================================================================
-# Redmine 6.1.1 Production (Easypanel + 한국어 완전 최적화)
+# Redmine 6.1.1 Production (Easypanel + WBS 빌드 수정)
 # ==============================================================================
 FROM redmine:6.1.1
 
-LABEL maintainer="admin@yourcompany.com"
+LABEL maintainer="pjs@kbs.co.kr"
 LABEL redmine.version="6.1.1"
 LABEL locale="ko_KR.UTF-8"
 
@@ -27,19 +27,16 @@ RUN sed -i '/ko_KR.UTF-8/s/^# //g' /etc/locale.gen && \
     update-locale LANG=ko_KR.UTF-8
 
 # ==============================================================================
-# [2] 한글 폰트 3종 설치 (버전 고정)
+# [2] 한글 폰트 3종 설치
 # ==============================================================================
 RUN mkdir -p /usr/share/fonts/truetype/custom && \
     cd /usr/share/fonts/truetype/custom && \
-    # Pretendard v1.3.9
     curl -fsSL -o pretendard.zip \
       https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip && \
     unzip -q pretendard.zip -d Pretendard && \
-    # D2Coding v1.3.2
     curl -fsSL -o d2coding.zip \
       https://github.com/naver/d2codingfont/releases/download/VER1.3.2/D2Coding-Ver1.3.2-20180524.zip && \
     unzip -q d2coding.zip -d D2Coding && \
-    # Spoqa Han Sans v3.0.0
     curl -fsSL -o spoqa.zip \
       https://github.com/spoqa/spoqa-han-sans/releases/download/v3.0.0/SpoqaHanSansNeo_all.zip && \
     unzip -q spoqa.zip -d Spoqa && \
@@ -47,7 +44,7 @@ RUN mkdir -p /usr/share/fonts/truetype/custom && \
     fc-cache -f -v
 
 # ==============================================================================
-# [3] 환경 변수 (한국 표준시 + UTF-8)
+# [3] 환경 변수
 # ==============================================================================
 ENV LANG=ko_KR.UTF-8 \
     LC_ALL=ko_KR.UTF-8 \
@@ -60,7 +57,7 @@ ENV LANG=ko_KR.UTF-8 \
 WORKDIR /usr/src/redmine
 
 # ==============================================================================
-# [4] PDF 폰트 링크 (한글 렌더링)
+# [4] PDF 폰트 링크
 # ==============================================================================
 RUN mkdir -p public/fonts && \
     ln -sf /usr/share/fonts/truetype/nanum/NanumGothic.ttf \
@@ -69,7 +66,7 @@ RUN mkdir -p public/fonts && \
            public/fonts/Pretendard.otf
 
 # ==============================================================================
-# [5] 용어 현지화 (일감 → 이슈)
+# [5] 용어 현지화
 # ==============================================================================
 RUN sed -i 's/일감/이슈/g' config/locales/ko.yml && \
     sed -i 's/새 일감/새 이슈/g' config/locales/ko.yml && \
@@ -78,7 +75,7 @@ RUN sed -i 's/일감/이슈/g' config/locales/ko.yml && \
     sed -i 's/관련 일감/관련 이슈/g' config/locales/ko.yml
 
 # ==============================================================================
-# [6] 플러그인 설치 (★ 실제 존재하는 버전으로 수정)
+# [6] 플러그인 설치
 # ==============================================================================
 RUN git clone --depth 1 \
       https://github.com/onozaty/redmine-view-customize.git \
@@ -92,7 +89,7 @@ RUN git clone --depth 1 \
     find plugins -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # ==============================================================================
-# [7] UI 커스터마이징 (Rails Initializer)
+# [7] UI 커스터마이징
 # ==============================================================================
 RUN mkdir -p config/initializers && \
     cat > config/initializers/zz_custom_ui.rb <<'RUBY'
@@ -119,7 +116,7 @@ Rails.application.config.after_initialize do
             font-weight: 600;
           }
 
-          /* 코드 블록 - 고정폭 한글 폰트 */
+          /* 코드 블록 */
           pre, code, tt, kbd, samp,
           .wiki-code, .CodeMirror, textarea[data-auto-complete] {
             font-family: 'D2Coding', 'Noto Sans Mono CJK KR', monospace !important;
@@ -127,12 +124,11 @@ Rails.application.config.after_initialize do
             line-height: 1.6;
           }
 
-          /* 한글 가독성 향상 */
+          /* 한글 가독성 */
           .wiki p, .wiki li, .journal .wiki {
             line-height: 1.8;
           }
 
-          /* 테이블 헤더 */
           table.list th {
             font-weight: 600;
           }
@@ -147,16 +143,7 @@ end
 RUBY
 
 # ==============================================================================
-# [8] Database Pool 설정 (★ 수정: database.yml.example 사용)
-# ==============================================================================
-RUN if [ -f config/database.yml.example ]; then \
-      cp config/database.yml.example config/database.yml.template && \
-      sed -i '/production:/a\  pool: <%= ENV.fetch("DB_POOL") { 10 } %>' \
-        config/database.yml.template; \
-    fi
-
-# ==============================================================================
-# [9] 디렉토리 준비 + 권한
+# [8] 디렉토리 준비 + 권한
 # ==============================================================================
 RUN mkdir -p \
     tmp/cache tmp/pids tmp/sockets \
@@ -164,14 +151,14 @@ RUN mkdir -p \
     chown -R redmine:redmine /usr/src/redmine /usr/local/bundle
 
 # ==============================================================================
-# [10] Gem + NPM 설치 (redmine 유저)
+# [9] Gem + NPM 설치 (★ 수정: WBS 빌드 devDependencies 포함)
 # ==============================================================================
 USER redmine
 
-# WBS 플러그인 빌드
+# WBS 플러그인 빌드 (--production 플래그 제거)
 RUN if [ -d plugins/redmine_wbs ]; then \
       cd plugins/redmine_wbs && \
-      npm ci --production --no-audit && \
+      npm ci --no-audit && \
       npm run production && \
       cd ../..; \
     fi
@@ -183,7 +170,7 @@ RUN bundle config set --local deployment 'true' && \
     bundle install --quiet
 
 # ==============================================================================
-# [11] Entrypoint 스크립트 (멱등성 + 한국어 메시지)
+# [10] Entrypoint 스크립트
 # ==============================================================================
 USER root
 RUN cat > /docker-entrypoint-custom.sh <<'BASH'
@@ -220,7 +207,6 @@ echo "✓ 초기화 완료"
 echo "Redmine 서버 시작 중..."
 echo "======================================"
 
-# Redmine 유저로 전환 후 실행
 exec gosu redmine "$@"
 BASH
 
@@ -229,7 +215,7 @@ RUN chmod +x /docker-entrypoint-custom.sh && \
     rm -rf /var/lib/apt/lists/*
 
 # ==============================================================================
-# [12] 헬스체크
+# [11] 헬스체크
 # ==============================================================================
 RUN echo '#!/bin/bash\ncurl -f -s http://localhost:3000/login > /dev/null || exit 1' \
     > /healthcheck.sh && chmod +x /healthcheck.sh
