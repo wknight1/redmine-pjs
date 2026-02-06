@@ -1,77 +1,149 @@
-services:
-  redmine:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: application
-    environment:
-      # [1. DB 연결 설정]
-      - REDMINE_DB_POSTGRES=db
-      - REDMINE_DB_DATABASE=redmine
-      - REDMINE_DB_USERNAME=redmine  # ★ 필수: 이 부분이 없어서 postgres 유저로 접속 시도함
-      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
-      
-      # [2. 보안 키 설정 - 이중 매핑]
-      # Redmine 전용 변수
-      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
-      # Rails 표준 변수 (Redmine이 놓쳐도 Rails가 잡도록 함)
-      - SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
-      
-      # [3. 기타 설정]
-      - TZ=Asia/Seoul
-      - RAILS_ENV=production
-    volumes:
-      - redmine_files:/usr/src/redmine/files
-      - redmine_plugins:/usr/src/redmine/plugins
-      - redmine_themes:/usr/src/redmine/public/themes
-    # [4. 실행 파이프라인]
-    # UI 자동 주입 스크립트 실행 후 서버 가동
-    command: >
-      sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
-             bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
-             /docker-entrypoint.sh rails server -b 0.0.0.0"
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: always
-    deploy:
-      resources:
-        limits:
-          memory: 2G
+version: '3.8'
 
+services:
+  # ======================================
+  # PostgreSQL 18.1 (한글 최적화)
+  # ======================================
   db:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: database
+    image: postgres:18.1-alpine  # alpine으로 경량화
+    container_name: redmine-db
     environment:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # [한글 최적화] ICU 로케일 강제 지정
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
-    # [튜닝]
+      # ICU 로케일 강제 적용
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
+      - TZ=Asia/Seoul
+    
     command: >
-      postgres 
-      -c shared_buffers=512MB 
-      -c work_mem=16MB 
-      -c max_connections=200 
-      -c default_text_search_config=pg_catalog.simple
+      postgres
+      -c shared_buffers=512MB
+      -c effective_cache_size=1GB
+      -c work_mem=16MB
+      -c maintenance_work_mem=128MB
+      -c max_connections=100
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=4
+      -c max_parallel_workers_per_gather=2
+      -c max_parallel_workers=4
+      -c log_destination=stderr
+      -c logging_collector=off
+      -c log_statement=mod
+      -c log_min_duration_statement=1000
+    
     volumes:
-      - db_data:/var/lib/postgresql
+      - db_data:/var/lib/postgresql/data  # ★ 수정: /data 경로 명시
+    
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U redmine"]
+      test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: always
+      start_period: 10s
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    
+    networks:
+      - redmine_net
 
+  # ======================================
+  # Redmine 6.1.1 Application
+  # ======================================
+  redmine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - RUBY_VERSION=3.3
+    
+    container_name: redmine-app
+    
+    environment:
+      # [DB 연결]
+      - REDMINE_DB_POSTGRES=db
+      - REDMINE_DB_DATABASE=redmine
+      - REDMINE_DB_USERNAME=redmine
+      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
+      - DB_POOL=10  # ★ 추가: Connection pool 설정
+      
+      # [보안]
+      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
+      - SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
+      
+      # [환경]
+      - RAILS_ENV=production
+      - RAILS_LOG_TO_STDOUT=1
+      - RAILS_SERVE_STATIC_FILES=1
+      - TZ=Asia/Seoul
+      
+      # [성능]
+      - RAILS_MAX_THREADS=5
+      - WEB_CONCURRENCY=2
+    
+    volumes:
+      - redmine_files:/usr/src/redmine/files
+      - redmine_plugins:/usr/src/redmine/plugins
+      - redmine_themes:/usr/src/redmine/public/themes
+      - redmine_logs:/usr/src/redmine/log
+    
+    ports:
+      - "${REDMINE_PORT:-3000}:3000"
+    
+    depends_on:
+      db:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD-SHELL", "/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    
+    networks:
+      - redmine_net
+
+# ======================================
+# Volumes (명명 규칙 통일)
+# ======================================
 volumes:
   db_data:
+    driver: local
   redmine_files:
+    driver: local
   redmine_plugins:
+    driver: local
   redmine_themes:
+    driver: local
+  redmine_logs:
+    driver: local
 
+# ======================================
+# Network (격리)
+# ======================================
 networks:
-  default:
-    name: redmine_pjs_net
+  redmine_net:
+    name: redmine_production
+    driver: bridge
