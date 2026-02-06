@@ -7,14 +7,17 @@ services:
     environment:
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
-      - REDMINE_DB_USERNAME=redmine  # ★ 이 부분이 누락되어 접속 실패했습니다.
+      - REDMINE_DB_USERNAME=redmine
+      # ★ [보안] Easypanel에 등록된 DB_PASSWORD 변수를 사용
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
-      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
+      # ★ [보안] Easypanel에 등록된 REDMINE_SECRET_KEY_BASE 변수를 사용
+      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
       - TZ=Asia/Seoul
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
+    # [실행 파이프라인] 마이그레이션 -> UI 주입 -> 서버 시작
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
@@ -36,9 +39,11 @@ services:
     environment:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
+      # ★ [보안] 앱과 동일한 DB_PASSWORD 변수를 사용 (동기화 불필요)
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # [성공 확인됨] 한글 로케일 적용 완료
+      # [성능] 한국어 ICU 정렬 및 로케일 최적화
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
+    # [튜닝] KBS 프로덕션 환경에 맞춘 DB 파라미터
     command: >
       postgres 
       -c shared_buffers=512MB 
