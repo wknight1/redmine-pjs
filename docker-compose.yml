@@ -20,10 +20,6 @@ services:
       db:
         condition: service_healthy
     restart: always
-    deploy:
-      resources:
-        limits:
-          memory: 2G
 
   db:
     image: postgres:18.1
@@ -31,20 +27,27 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # ICU 한국어 + Simple 검색 최적화
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko-KR --lc-ctype=ko-KR --set=default_text_search_config=pg_catalog.simple
+      # [수정] --set 옵션을 여기서 제거하고 command로 이동합니다.
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko-KR --lc-ctype=ko-KR
+      - TZ=Asia/Seoul
+    # [보정] 서버 설정값과 검색 엔진 설정을 여기서 명시합니다.
     command: >
-      postgres -c shared_buffers=512MB -c work_mem=16MB -c max_connections=200
+      postgres 
+      -c shared_buffers=512MB 
+      -c work_mem=16MB 
+      -c max_connections=200
+      -c default_text_search_config=pg_catalog.simple
     volumes:
       - db_data:/var/lib/postgresql
+    # [최적화] 점검 명령어를 더 단순하고 확실하게 변경합니다.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U redmine"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
     restart: always
 
-# ★ 볼륨 정의 (이 부분이 있어야 에러가 나지 않습니다)
 volumes:
   db_data:
   redmine_files:
