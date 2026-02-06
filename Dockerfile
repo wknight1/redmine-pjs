@@ -42,7 +42,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm \
     git curl unzip wget \
     ghostscript libyaml-dev \
-    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # 한글 로케일 생성 및 활성화
@@ -51,7 +50,7 @@ RUN sed -i '/ko_KR.UTF-8/s/^# //g' /etc/locale.gen && \
     update-locale LANG=ko_KR.UTF-8
 
 # ==============================================================================
-# [2] 한글 폰트 설치 (Pretendard, D2Coding, Spoqa)
+# [2] 한글 폰트 설치
 # ==============================================================================
 RUN mkdir -p /usr/share/fonts/truetype/custom && \
     cd /usr/share/fonts/truetype/custom && \
@@ -90,7 +89,7 @@ RUN mkdir -p public/fonts && \
            public/fonts/Pretendard.otf
 
 # ==============================================================================
-# [5] 용어 현지화 (일감 → 이슈)
+# [5] 용어 현지화
 # ==============================================================================
 RUN sed -i 's/일감/이슈/g' config/locales/ko.yml && \
     sed -i 's/새 일감/새 이슈/g' config/locales/ko.yml && \
@@ -113,7 +112,7 @@ RUN git clone --depth 1 \
     find plugins -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # ==============================================================================
-# [7] UI 커스터마이징 (Rails Initializer)
+# [7] UI 커스터마이징
 # ==============================================================================
 RUN cat > config/initializers/zz_custom_ui.rb <<'RUBY'
 # KBS Production UI - 한국어 폰트 최적화
@@ -193,58 +192,75 @@ RUN chown -R redmine:redmine \
     /usr/local/bundle
 
 # ==============================================================================
-# [12] Entrypoint 스크립트
+# [12] 커스텀 초기화 스크립트 (★ 수정: 원본 entrypoint 호출 후 실행)
 # ==============================================================================
-RUN cat > /docker-entrypoint-custom.sh <<'BASH'
+RUN cat > /usr/local/bin/redmine-init.sh <<'BASH'
 #!/bin/bash
 set -e
 
 echo "======================================"
-echo "Redmine 초기화 시작"
+echo "Redmine 추가 초기화 시작"
 echo "시간: $(date '+%Y-%m-%d %H:%M:%S %Z')"
 echo "======================================"
 
-# 1. DB 마이그레이션
-echo "[1/4] 데이터베이스 마이그레이션 중..."
-bundle exec rake db:migrate RAILS_ENV=production
-
-# 2. 플러그인 마이그레이션
-echo "[2/4] 플러그인 마이그레이션 중..."
+# 1. 플러그인 마이그레이션
+echo "[1/3] 플러그인 마이그레이션 중..."
 bundle exec rake redmine:plugins:migrate RAILS_ENV=production
 
-# 3. Asset Precompile
+# 2. Asset Precompile (필요시)
 if [ ! -d tmp/cache/assets ] || [ -z "$(ls -A tmp/cache/assets 2>/dev/null)" ]; then
-  echo "[3/4] 에셋 컴파일 중..."
+  echo "[2/3] 에셋 컴파일 중..."
   bundle exec rake assets:precompile RAILS_ENV=production
 else
-  echo "[3/4] 에셋 이미 컴파일됨 (건너뜀)"
+  echo "[2/3] 에셋 이미 컴파일됨 (건너뜀)"
 fi
 
-# 4. 권한 확인
-echo "[4/4] 파일 권한 확인 중..."
+# 3. 권한 확인
+echo "[3/3] 파일 권한 확인 중..."
 chown -R redmine:redmine files log tmp public/plugin_assets 2>/dev/null || true
 
 echo "======================================"
-echo "✓ 초기화 완료"
-echo "Redmine 서버 시작 중..."
+echo "✓ 추가 초기화 완료"
 echo "======================================"
-
-exec gosu redmine "$@"
 BASH
 
-RUN chmod +x /docker-entrypoint-custom.sh
+RUN chmod +x /usr/local/bin/redmine-init.sh
 
 # ==============================================================================
-# [13] 헬스체크
+# [13] 원본 entrypoint 래핑 (★ 핵심: database.yml 생성 보장)
+# ==============================================================================
+RUN mv /docker-entrypoint.sh /docker-entrypoint-original.sh && \
+    cat > /docker-entrypoint.sh <<'BASH'
+#!/bin/bash
+set -e
+
+# 1. 원본 entrypoint 실행 (database.yml 생성)
+echo "🚀 [1/2] Redmine 기본 초기화 중..."
+source /docker-entrypoint-original.sh
+
+# 2. 커스텀 초기화 (플러그인 등)
+echo "🚀 [2/2] 한국어 환경 초기화 중..."
+/usr/local/bin/redmine-init.sh
+
+# 3. 서버 시작
+echo "✅ 초기화 완료. Redmine 서버 시작 중..."
+exec "$@"
+BASH
+
+RUN chmod +x /docker-entrypoint.sh
+
+# ==============================================================================
+# [14] 헬스체크
 # ==============================================================================
 RUN echo '#!/bin/bash\ncurl -f -s http://localhost:3000/login > /dev/null || exit 1' \
     > /healthcheck.sh && chmod +x /healthcheck.sh
 
 # ==============================================================================
-# [최종] 보안 설정
+# [최종] 기본 설정 유지
 # ==============================================================================
 USER redmine
 EXPOSE 3000
 
-ENTRYPOINT ["/docker-entrypoint-custom.sh"]
-CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
+# ★ 원본 ENTRYPOINT 유지 (database.yml 생성 보장)
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["rails", "server", "-b", "0.0.0.0"]
