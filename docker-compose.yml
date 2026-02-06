@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # [Redmine 서비스 설정]
+  redmine:
+    build: . # 현재 디렉토리의 Dockerfile을 읽어 빌드함
+    networks:
+      - redmine_internal_net # 외부 노출을 제한하고 내부 통신 전용 네트워크 사용
+    environment:
+      - REDMINE_DB_POSTGRES=db
+      - REDMINE_DB_DATABASE=redmine
+      # 보안: 실제 값은 Easypanel 환경변수 탭에서 관리 (비밀번호 노출 방지)
+      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
+      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
+    volumes:
+      # 프로덕션 필수: 컨테이너가 삭제되어도 데이터는 남도록 Named Volume 연결
+      - redmine_files:/usr/src/redmine/files      # 첨부 파일 저장소
+      - redmine_plugins:/usr/src/redmine/plugins  # 플러그인 코드 보존
+      - redmine_themes:/usr/src/redmine/public/themes # 테마 에셋 보존
+    # 서버 기동 시 명령: 플러그인 DB 마이그레이션(업데이트) 후 Rails 서버 시작
+    command: >
+      sh -c "bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
+             /docker-entrypoint.sh rails server -b 0.0.0.0"
+    depends_on:
+      - db # 데이터베이스가 먼저 실행된 후 Redmine 시작
+    restart: always
+
+  # [데이터베이스 서비스 설정]
+  db:
+    image: postgres:18.1-alpine # 2026년 최신 안정 버전 (경량화된 alpine 버전)
+    networks:
+      - redmine_internal_net
+    environment:
+      - POSTGRES_DB=redmine
+      - POSTGRES_PASSWORD=${DB_PASSWORD} # Redmine 서비스와 동일한 비밀번호 주입
+    volumes:
+      # DB 영속성: 가장 중요한 데이터베이스 파일이 저장되는 물리 공간
+      - db_data:/var/lib/postgresql/data
+    restart: always
+
+# [네트워크 정의]
+# - bridge 모드를 사용하여 서비스 간 독립된 가상 네트워크 형성 (보안 강화)
+networks:
+  redmine_internal_net:
+    driver: bridge
+
+# [볼륨 정의]
+# - 여기에 선언된 이름들은 Docker 호스트의 안전한 곳에 실제 물리 디렉토리를 예약함
+volumes:
+  db_data:         # PostgreSQL 데이터 파일
+  redmine_files:   # 사용자 업로드 파일
+  redmine_plugins: # 자동 설치된 플러그인 에셋
+  redmine_themes:  # 자동 설치된 테마 에셋
