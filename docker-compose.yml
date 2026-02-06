@@ -13,7 +13,6 @@ services:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
-    # Entrypoint 스크립트를 경유하여 실행 (설정 파일 자동 생성 보장)
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              /docker-entrypoint.sh rails server -b 0.0.0.0"
@@ -22,7 +21,6 @@ services:
     restart: always
 
   db:
-    # 2026년 표준 안정 버전 사용
     image: postgres:18.1
     networks:
       - redmine_pjs_net

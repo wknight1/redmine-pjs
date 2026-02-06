@@ -1,16 +1,15 @@
-# [1] 공식 표준 이미지 사용 (Debian 기반으로 로케일 지원 우수)
+# [1] 공식 표준 이미지 (Debian 기반으로 로케일 지원 우수)
 FROM redmine:6.1.1
 
 USER root
 
 # [2] 한국어 로케일 및 필수 빌드 도구 설치
-# locales-all을 설치하면 ko_KR.UTF-8을 즉시 사용할 수 있습니다.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     locales locales-all tzdata \
     git curl unzip build-essential libpq-dev nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
-# 시스템 환경 변수를 한국어로 고정
+# 시스템 환경 변수 한국어 고정
 ENV LANG=ko_KR.UTF-8 \
     LANGUAGE=ko_KR.UTF-8 \
     LC_ALL=ko_KR.UTF-8 \
@@ -21,7 +20,7 @@ WORKDIR /usr/src/redmine
 # [3] 한국어 용어 커스텀 (일감 -> 이슈)
 RUN sed -i 's/일감/이슈/g' config/locales/ko.yml
 
-# [4] 테마 설치 (검증된 Public 리포지토리)
+# [4] 테마 설치 (검증된 리포지토리)
 RUN mkdir -p public/themes
 RUN curl -fL https://github.com/VitexSoftware/magopale/archive/refs/heads/master.zip -o opale.zip && \
     unzip opale.zip && mv magopale-master public/themes/opale && rm opale.zip
@@ -33,9 +32,9 @@ RUN git clone --depth 1 https://github.com/onozaty/redmine-view-customize.git pl
     git clone --depth 1 https://github.com/akiko-pusu/redmine_issue_templates.git plugins/redmine_issue_templates && \
     git clone --depth 1 https://github.com/eXolnet/redmine_wbs.git plugins/redmine_wbs
 
-# [6] 핵심: 모든 작업 디렉토리 권한을 redmine 계정으로 일괄 변경
-# config 폴더 권한이 있어야 database.yml 생성 에러가 나지 않습니다.
-RUN chown -R redmine:redmine /usr/src/redmine
+# [6] 핵심: 권한 설정 (작업 디렉토리 + 홈 디렉토리)
+# Bundler 에러(code 23)를 방지하기 위해 홈 디렉토리까지 권한 부여
+RUN chown -R redmine:redmine /usr/src/redmine /home/redmine
 
 # [7] 플러그인 빌드 및 의존성 설치
 RUN cd plugins/redmine_wbs && npm install && npm run production
