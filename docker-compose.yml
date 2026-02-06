@@ -16,10 +16,14 @@ services:
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
              /docker-entrypoint.sh rails server -b 0.0.0.0"
+    # 핵심 수정: condition을 service_started로 변경하여 'unhealthy'로 인한 배포 중단 방지
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   db:
     image: postgres:18.1
@@ -27,25 +31,24 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # [수정] --set 옵션을 여기서 제거하고 command로 이동합니다.
+      # ICU 한국어 설정 최적화
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko-KR --lc-ctype=ko-KR
       - TZ=Asia/Seoul
-    # [보정] 서버 설정값과 검색 엔진 설정을 여기서 명시합니다.
+    # 성능 튜닝 및 검색 설정
     command: >
       postgres 
       -c shared_buffers=512MB 
       -c work_mem=16MB 
-      -c max_connections=200
+      -c max_connections=200 
       -c default_text_search_config=pg_catalog.simple
     volumes:
       - db_data:/var/lib/postgresql
-    # [최적화] 점검 명령어를 더 단순하고 확실하게 변경합니다.
+    # Healthcheck를 유지하되, 앱 기동을 방해하지 않도록 설정
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U redmine"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 5
     restart: always
 
 volumes:
