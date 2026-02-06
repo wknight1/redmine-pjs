@@ -28,11 +28,10 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # DB 초기화 시 한국어 로케일 강제 적용
-      - POSTGRES_INITDB_ARGS=--locale=ko_KR.UTF-8
+      # 핵심 수정: ko_KR.UTF-8 대신 인코딩만 UTF-8로 지정하여 에러 회피 (한국어 지원은 완벽함)
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
       - TZ=Asia/Seoul
     volumes:
-      # Postgres 18+ 대응: /data를 떼고 상위 폴더 마운트
       - db_data:/var/lib/postgresql 
     restart: always
 
