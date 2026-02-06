@@ -6,13 +6,14 @@ services:
     environment:
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
-      # Easypanel Environment 탭에 설정된 변수를 직접 주입합니다.
+      # Easypanel Environment 탭에 설정된 변수를 그대로 가져옵니다.
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
+    # 서버 기동 전 플러그인 마이그레이션 자동 수행
     command: >
       sh -c "bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              /docker-entrypoint.sh rails server -b 0.0.0.0"
