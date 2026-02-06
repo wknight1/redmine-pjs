@@ -9,6 +9,7 @@ services:
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
       - TZ=Asia/Seoul
+      - BUNDLE_USER_HOME=/usr/src/redmine/.bundle_cache
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
@@ -28,11 +29,11 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # 핵심 수정: ko_KR.UTF-8 대신 인코딩만 UTF-8로 지정하여 에러 회피 (한국어 지원은 완벽함)
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+      # Postgres 18 대응 최신 로케일 설정 (ICU 사용)
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR
       - TZ=Asia/Seoul
     volumes:
-      - db_data:/var/lib/postgresql 
+      - db_data:/var/lib/postgresql
     restart: always
 
 networks:
