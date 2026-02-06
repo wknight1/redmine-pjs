@@ -1,9 +1,9 @@
 # ==============================================================================
-# Redmine 6.1.1 Production (Easypanel + WBS 빌드 수정)
+# Redmine 6.1.1 Production (Easypanel 최적화 + 플러그인 의존성 해결)
 # ==============================================================================
 FROM redmine:6.1.1
 
-LABEL maintainer="pjs@kbs.co.kr"
+LABEL maintainer="admin@yourcompany.com"
 LABEL redmine.version="6.1.1"
 LABEL locale="ko_KR.UTF-8"
 
@@ -19,15 +19,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm \
     git curl unzip wget \
     ghostscript libyaml-dev \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# 한글 로케일 생성 및 활성화
+# 한글 로케일 생성
 RUN sed -i '/ko_KR.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen ko_KR.UTF-8 && \
     update-locale LANG=ko_KR.UTF-8
 
 # ==============================================================================
-# [2] 한글 폰트 3종 설치
+# [2] 한글 폰트 설치
 # ==============================================================================
 RUN mkdir -p /usr/share/fonts/truetype/custom && \
     cd /usr/share/fonts/truetype/custom && \
@@ -66,7 +67,7 @@ RUN mkdir -p public/fonts && \
            public/fonts/Pretendard.otf
 
 # ==============================================================================
-# [5] 용어 현지화
+# [5] 용어 현지화 (일감 → 이슈)
 # ==============================================================================
 RUN sed -i 's/일감/이슈/g' config/locales/ko.yml && \
     sed -i 's/새 일감/새 이슈/g' config/locales/ko.yml && \
@@ -89,10 +90,9 @@ RUN git clone --depth 1 \
     find plugins -name ".git" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # ==============================================================================
-# [7] UI 커스터마이징
+# [7] UI 커스터마이징 (Rails Initializer)
 # ==============================================================================
-RUN mkdir -p config/initializers && \
-    cat > config/initializers/zz_custom_ui.rb <<'RUBY'
+RUN cat > config/initializers/zz_custom_ui.rb <<'RUBY'
 # KBS Production UI - 한국어 폰트 최적화
 Rails.application.config.after_initialize do
   if defined?(ViewCustomize)
@@ -101,7 +101,6 @@ Rails.application.config.after_initialize do
         path_pattern: '.*',
         customization_type: 'style',
         code: <<~CSS,
-          /* 한글 최적화 폰트 스택 */
           body, #content, #header, #footer,
           #main-menu, #sidebar, .wiki, p, div, span {
             font-family: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif !important;
@@ -110,13 +109,11 @@ Rails.application.config.after_initialize do
             word-wrap: break-word;
           }
 
-          /* 제목 폰트 */
           h1, h2, h3, h4, h5, h6, .subject a, .title {
             font-family: 'Pretendard Variable', 'Noto Sans KR', sans-serif !important;
             font-weight: 600;
           }
 
-          /* 코드 블록 */
           pre, code, tt, kbd, samp,
           .wiki-code, .CodeMirror, textarea[data-auto-complete] {
             font-family: 'D2Coding', 'Noto Sans Mono CJK KR', monospace !important;
@@ -124,7 +121,6 @@ Rails.application.config.after_initialize do
             line-height: 1.6;
           }
 
-          /* 한글 가독성 */
           .wiki p, .wiki li, .journal .wiki {
             line-height: 1.8;
           }
@@ -143,19 +139,15 @@ end
 RUBY
 
 # ==============================================================================
-# [8] 디렉토리 준비 + 권한
+# [8] 디렉토리 준비
 # ==============================================================================
 RUN mkdir -p \
     tmp/cache tmp/pids tmp/sockets \
-    log files plugins/assets public/plugin_assets && \
-    chown -R redmine:redmine /usr/src/redmine /usr/local/bundle
+    log files plugins/assets public/plugin_assets
 
 # ==============================================================================
-# [9] Gem + NPM 설치 (★ 수정: WBS 빌드 devDependencies 포함)
+# [9] WBS 플러그인 빌드 (root 유저에서 실행)
 # ==============================================================================
-USER redmine
-
-# WBS 플러그인 빌드 (--production 플래그 제거)
 RUN if [ -d plugins/redmine_wbs ]; then \
       cd plugins/redmine_wbs && \
       npm ci --no-audit && \
@@ -163,16 +155,24 @@ RUN if [ -d plugins/redmine_wbs ]; then \
       cd ../..; \
     fi
 
-# Bundler 설정
-RUN bundle config set --local deployment 'true' && \
-    bundle config set --local without 'development test' && \
+# ==============================================================================
+# [10] Bundler 설정 + Gem 설치 (★ 핵심: deployment 모드 제거)
+# ==============================================================================
+# 플러그인 Gemfile 의존성 병합
+RUN bundle config set --local without 'development test' && \
     bundle config set --local jobs 4 && \
-    bundle install --quiet
+    bundle install
 
 # ==============================================================================
-# [10] Entrypoint 스크립트
+# [11] 권한 설정
 # ==============================================================================
-USER root
+RUN chown -R redmine:redmine \
+    /usr/src/redmine \
+    /usr/local/bundle
+
+# ==============================================================================
+# [12] Entrypoint 스크립트
+# ==============================================================================
 RUN cat > /docker-entrypoint-custom.sh <<'BASH'
 #!/bin/bash
 set -e
@@ -210,18 +210,16 @@ echo "======================================"
 exec gosu redmine "$@"
 BASH
 
-RUN chmod +x /docker-entrypoint-custom.sh && \
-    apt-get update && apt-get install -y --no-install-recommends gosu curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN chmod +x /docker-entrypoint-custom.sh
 
 # ==============================================================================
-# [11] 헬스체크
+# [13] 헬스체크
 # ==============================================================================
 RUN echo '#!/bin/bash\ncurl -f -s http://localhost:3000/login > /dev/null || exit 1' \
     > /healthcheck.sh && chmod +x /healthcheck.sh
 
 # ==============================================================================
-# [최종] 보안 + 실행
+# [최종] 보안 설정
 # ==============================================================================
 USER redmine
 EXPOSE 3000
