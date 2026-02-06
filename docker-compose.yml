@@ -8,8 +8,9 @@ services:
       - REDMINE_DB_DATABASE=redmine
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
+      # Redis를 세션/캐시 저장소로 사용하여 성능 향상
+      - REDMINE_REDIS_URL=redis://redis:6379/0
       - TZ=Asia/Seoul
-      - BUNDLE_USER_HOME=/usr/src/redmine/.bundle_cache
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
@@ -18,8 +19,15 @@ services:
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              /docker-entrypoint.sh rails server -b 0.0.0.0"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G # 팀 규모에 맞춘 권장 메모리
 
   db:
     image: postgres:18.1
@@ -29,11 +37,24 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # 한글 검색 최적화: --icu-locale 및 simple search 설정
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --set=default_text_search_config=pg_catalog.simple
+      # [DB 최적화 설정]
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko-KR --lc-ctype=ko-KR
       - TZ=Asia/Seoul
+    command: >
+      postgres -c shared_buffers=512MB -c work_mem=16MB -c max_connections=200
     volumes:
       - db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - redmine_pjs_net
     restart: always
 
 networks:
