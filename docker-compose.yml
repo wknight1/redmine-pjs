@@ -6,28 +6,33 @@ services:
     environment:
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
-      # Easypanel Environment 탭에 설정된 변수를 그대로 가져옵니다.
-      - REDMINE_DB_PASSWORD="${DB_PASSWORD}"
-      - REDMINE_SECRET_KEY_BASE="${REDMINE_SECRET_KEY}"
+      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
+      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
+      - TZ=Asia/Seoul
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
-    # 서버 기동 전 플러그인 마이그레이션 자동 수행
+    # Entrypoint 스크립트를 경유하여 실행 (설정 파일 자동 생성 보장)
     command: >
-      sh -c "bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
+      sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              /docker-entrypoint.sh rails server -b 0.0.0.0"
     depends_on:
       - db
     restart: always
 
   db:
-    image: postgres:18.1-alpine
+    # 2026년 표준 안정 버전 사용
+    image: postgres:18.1
     networks:
       - redmine_pjs_net
     environment:
+      - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
-      - POSTGRES_PASSWORD="${DB_PASSWORD}"
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      # DB 초기화 시 한국어 로케일 강제 적용
+      - POSTGRES_INITDB_ARGS=--locale=ko_KR.UTF-8
+      - TZ=Asia/Seoul
     volumes:
       - db_data:/var/lib/postgresql/data
     restart: always
