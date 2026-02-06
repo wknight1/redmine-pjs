@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+  # ============================================================================
+  # PostgreSQL 18.1 (★ 볼륨 경로 수정)
+  # ============================================================================
   db:
     image: postgres:18.1
     container_name: redmine-postgres
@@ -9,47 +12,32 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
       - TZ=Asia/Seoul
+      # ★ 단순화: ICU 제거 (안정성 우선)
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=ko_KR.UTF-8
     
+    # PostgreSQL 튜닝 (최소한으로)
     command:
       - postgres
       - -c
       - shared_buffers=256MB
       - -c
-      - effective_cache_size=768MB
-      - -c
-      - work_mem=16MB
-      - -c
-      - maintenance_work_mem=64MB
-      - -c
       - max_connections=100
-      - -c
-      - checkpoint_completion_target=0.9
-      - -c
-      - wal_buffers=8MB
-      - -c
-      - random_page_cost=1.1
-      - -c
-      - effective_io_concurrency=200
-      - -c
-      - min_wal_size=512MB
-      - -c
-      - max_wal_size=2GB
       - -c
       - log_statement=mod
       - -c
       - log_min_duration_statement=1000
     
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # ★★★ 핵심 수정: /data 제거 ★★★
+      - db_data:/var/lib/postgresql
     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 60s  # 초기화 시간 충분히 확보
     
     restart: unless-stopped
     
@@ -59,9 +47,12 @@ services:
           cpus: '1.0'
           memory: 1G
         reservations:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '0.25'
+          memory: 256M
 
+  # ============================================================================
+  # Redmine 6.1.1 Application
+  # ============================================================================
   redmine:
     build:
       context: .
@@ -104,7 +95,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 90s
+      start_period: 120s
     
     restart: unless-stopped
     
@@ -115,7 +106,7 @@ services:
           memory: 2G
         reservations:
           cpus: '0.5'
-          memory: 1G
+          memory: 512M
 
 volumes:
   db_data:
