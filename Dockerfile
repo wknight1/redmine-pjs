@@ -1,7 +1,30 @@
 # ==============================================================================
-# Redmine 6.1.1 Production (Easypanel 최적화 + 플러그인 의존성 해결)
+# STAGE 1: PostgreSQL 18.1 + 한국어 로케일
 # ==============================================================================
-FROM redmine:6.1.1
+FROM postgres:18.1 AS database
+
+USER root
+
+# 한국어 로케일 패키지 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    locales \
+    && rm -rf /var/lib/apt/lists/*
+
+# ko_KR.UTF-8 로케일 생성
+RUN sed -i '/ko_KR.UTF-8/s/^# //g' /etc/locale.gen && \
+    locale-gen ko_KR.UTF-8 && \
+    update-locale LANG=ko_KR.UTF-8
+
+# 환경 변수 설정
+ENV LANG=ko_KR.UTF-8 \
+    LC_ALL=ko_KR.UTF-8 \
+    LANGUAGE=ko_KR:ko \
+    TZ=Asia/Seoul
+
+# ==============================================================================
+# STAGE 2: Redmine 6.1.1 + 한국어 완전 최적화
+# ==============================================================================
+FROM redmine:6.1.1 AS application
 
 LABEL maintainer="admin@yourcompany.com"
 LABEL redmine.version="6.1.1"
@@ -22,13 +45,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu \
     && rm -rf /var/lib/apt/lists/*
 
-# 한글 로케일 생성
+# 한글 로케일 생성 및 활성화
 RUN sed -i '/ko_KR.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen ko_KR.UTF-8 && \
     update-locale LANG=ko_KR.UTF-8
 
 # ==============================================================================
-# [2] 한글 폰트 설치
+# [2] 한글 폰트 설치 (Pretendard, D2Coding, Spoqa)
 # ==============================================================================
 RUN mkdir -p /usr/share/fonts/truetype/custom && \
     cd /usr/share/fonts/truetype/custom && \
@@ -146,7 +169,7 @@ RUN mkdir -p \
     log files plugins/assets public/plugin_assets
 
 # ==============================================================================
-# [9] WBS 플러그인 빌드 (root 유저에서 실행)
+# [9] WBS 플러그인 빌드
 # ==============================================================================
 RUN if [ -d plugins/redmine_wbs ]; then \
       cd plugins/redmine_wbs && \
@@ -156,9 +179,8 @@ RUN if [ -d plugins/redmine_wbs ]; then \
     fi
 
 # ==============================================================================
-# [10] Bundler 설정 + Gem 설치 (★ 핵심: deployment 모드 제거)
+# [10] Bundler 설정 + Gem 설치
 # ==============================================================================
-# 플러그인 Gemfile 의존성 병합
 RUN bundle config set --local without 'development test' && \
     bundle config set --local jobs 4 && \
     bundle install

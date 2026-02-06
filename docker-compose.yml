@@ -1,11 +1,13 @@
 version: '3.8'
 
 services:
-  # ============================================================================
-  # PostgreSQL 18.1 (★ 볼륨 경로 수정)
-  # ============================================================================
+  # PostgreSQL (커스텀 빌드)
   db:
-    image: postgres:18.1
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: database  # ★ Stage 지정
+    
     container_name: redmine-postgres
     
     environment:
@@ -13,10 +15,8 @@ services:
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - TZ=Asia/Seoul
-      # ★ 단순화: ICU 제거 (안정성 우선)
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=ko_KR.UTF-8
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
     
-    # PostgreSQL 튜닝 (최소한으로)
     command:
       - postgres
       - -c
@@ -29,7 +29,6 @@ services:
       - log_min_duration_statement=1000
     
     volumes:
-      # ★★★ 핵심 수정: /data 제거 ★★★
       - db_data:/var/lib/postgresql
     
     healthcheck:
@@ -37,26 +36,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s  # 초기화 시간 충분히 확보
+      start_period: 60s
     
     restart: unless-stopped
     
     deploy:
       resources:
         limits:
-          cpus: '1.0'
           memory: 1G
-        reservations:
-          cpus: '0.25'
-          memory: 256M
 
-  # ============================================================================
-  # Redmine 6.1.1 Application
-  # ============================================================================
+  # Redmine (커스텀 빌드)
   redmine:
     build:
       context: .
       dockerfile: Dockerfile
+      target: application  # ★ Stage 지정
     
     container_name: redmine-app
     
@@ -65,16 +59,19 @@ services:
       - REDMINE_DB_DATABASE=redmine
       - REDMINE_DB_USERNAME=redmine
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
+      - REDMINE_DB_ENCODING=utf8
       - DB_POOL=10
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
       - SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
       - RAILS_ENV=production
       - RAILS_LOG_TO_STDOUT=1
       - RAILS_SERVE_STATIC_FILES=true
+      - LANG=ko_KR.UTF-8
+      - LC_ALL=ko_KR.UTF-8
       - TZ=Asia/Seoul
+      - REDMINE_LANG=ko
       - RAILS_MAX_THREADS=5
       - WEB_CONCURRENCY=2
-      - MALLOC_ARENA_MAX=2
     
     volumes:
       - redmine_files:/usr/src/redmine/files
@@ -102,11 +99,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
           memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
 
 volumes:
   db_data:
