@@ -2,6 +2,7 @@ services:
   redmine:
     build:
       context: .
+      dockerfile: Dockerfile
       target: application
     environment:
       - REDMINE_DB_POSTGRES=db
@@ -13,11 +14,13 @@ services:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
-    # [한글 완전 정복 파이프라인]
+    # [KBS 프로덕션 파이프라인]
+    # 1. 플러그인 DB 마이그레이션
+    # 2. UI/UX 디자인 자동 주입
+    # 3. 웹 서버(Puma) 기동
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
-             bundle exec rails runner \"ActiveRecord::Base.connection.execute('CREATE EXTENSION IF NOT EXISTS pg_trgm')\" -e production &&
-             bundle exec rails runner /usr/src/redmine/init_all.rb -e production &&
+             bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
              /docker-entrypoint.sh rails server -b 0.0.0.0"
     depends_on:
       db:
@@ -31,14 +34,21 @@ services:
   db:
     build:
       context: .
+      dockerfile: Dockerfile
       target: database
     environment:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
+      # [ICU 로케일 적용] 한글 정렬 및 검색 최적화
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
+    # [DB 성능 튜닝] KBS 디지털서비스부 규모에 맞춘 메모리 설정
     command: >
-      postgres -c shared_buffers=512MB -c work_mem=16MB -c max_connections=200 -c default_text_search_config=pg_catalog.simple
+      postgres 
+      -c shared_buffers=512MB 
+      -c work_mem=16MB 
+      -c max_connections=200 
+      -c default_text_search_config=pg_catalog.simple
     volumes:
       - db_data:/var/lib/postgresql
     healthcheck:
