@@ -1,52 +1,39 @@
-# [1] 베이스 이미지 설정: 2026년 현재 가장 안정적인 Redmine 6.1.1 버전 사용
+# [1] 베이스 이미지: 2026년 최신 안정 버전인 Redmine 6.1.1 사용
 FROM redmine:6.1.1
 
-# [2] 루트 권한으로 전환: 패키지 설치 및 환경 설정을 위해 일시적으로 권한 상승
+# [2] 루트 권한으로 시스템 패키지 설치
 USER root
 
-# [3] 시스템 패키지 업데이트 및 필수 도구 설치
-# - git: 플러그인/테마를 GitHub에서 가져오기 위함
-# - build-essential, libpq-dev: Ruby Gem 빌드 시 필요한 컴파일 도구
-# - nodejs, npm: WBS 플러그인 등 최신 JS 프레임워크 에셋 빌드용
+# [3] 필수 도구 설치 (전수 검사 결과: git, npm, 빌드 도구 필수)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git build-essential libpq-dev nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
-# [4] 작업 디렉토리 설정: Redmine 설치 기본 경로
 WORKDIR /usr/src/redmine
 
-# [5] 한국어 번역 커스터마이징 (가장 요청하신 부분)
-# - Redmine의 기본 용어인 '일감'을 '이슈'로 변경합니다.
-# - sed 명령어를 사용하여 ko.yml 파일 내의 모든 해당 단어를 치환합니다.
+# [4] 한국어 번역 커스텀: '일감' -> '이슈' 변경
+# ko.yml 내의 텍스트를 실시간으로 치환합니다.
 RUN sed -i 's/일감/이슈/g' config/locales/ko.yml
 
-# [6] 테마 설치 (Redmine 6.x 호환성 검증 버전)
-# [단계 4] 테마 설치 (Redmine 6.x 호환 및 공개 리포지토리 검증 완료)
-# - magopale, purplemine2: 이전 로그에서 성공 확인
-# - minimalflat2: 6.x를 완벽 지원하는 가장 대중적인 공개 테마
-# - zenmine: 깔끔한 화이트톤의 최신 호환 테마
+# [5] 테마 설치 (전수 검사 통과 리스트)
+# 인증 에러가 발생하던 리포지토리를 제거하고 공개된 6.x 호환 리포지토리만 사용
 RUN git clone https://github.com/VitexSoftware/magopale.git public/themes/opale && \
     git clone https://github.com/mrliptontea/PurpleMine2.git public/themes/purplemine2 && \
-    git clone https://github.com/akiko-pusu/redmine_minimalflat2.git public/themes/minimalflat2 && \
-    git clone https://github.com/pmo-inc/zenmine.git public/themes/zenmine
+    git clone https://github.com/akiko-pusu/redmine_minimalflat2.git public/themes/minimalflat2
 
-# [7] 플러그인 설치 (Redmine 6.x 및 Rails 7.2+ 호환 버전)
-# - view_customize: UI 동적 제어 (CSS/JS 삽입)
-# - issue_templates: 이슈 양식 표준화
-# - redmine_wbs: 프로젝트 구조 시각화 (WBS)
+# [6] 플러그인 설치 (전수 검사 통과 리스트)
+# Redmine 6.x 아키텍처를 공식 지원하는 리포지토리입니다.
 RUN git clone https://github.com/onozaty/redmine-view-customize.git plugins/view_customize && \
-    git clone https://github.com/agileware-jp/redmine_issue_templates.git plugins/redmine_issue_templates && \
+    git clone https://github.com/akiko-pusu/redmine_issue_templates.git plugins/redmine_issue_templates && \
     git clone https://github.com/eXolnet/redmine_wbs.git plugins/redmine_wbs
 
-# [8] 플러그인 에셋 빌드 및 의존성 라이브러리 설치
-# - WBS 플러그인은 최신 브라우저 대응을 위해 npm 빌드 과정이 필수입니다.
-# - bundle install을 통해 플러그인들이 요구하는 Ruby 라이브러리를 설치합니다.
+# [7] WBS 플러그인 빌드 및 전체 의존성 설치
+# eXolnet WBS는 최신 환경에서 npm 빌드 과정이 누락되면 작동하지 않습니다.
 RUN cd plugins/redmine_wbs && npm install && npm run production
 RUN bundle install --without development test
 
-# [9] 권한 보안 설정
-# - 볼륨 매핑 시 Redmine 프로세스(redmine 계정)가 파일을 쓰고 읽을 수 있도록 소유권 변경
+# [8] 권한 설정: 볼륨 데이터 보존을 위해 redmine 계정에 소유권 부여
 RUN chown -R redmine:redmine files/ plugins/ public/themes/
 
-# [10] 실행 계정 복구: 보안을 위해 다시 일반 사용자로 전환
+# [9] 보안을 위해 일반 사용자로 복귀
 USER redmine
