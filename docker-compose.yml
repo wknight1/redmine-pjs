@@ -1,44 +1,62 @@
 version: '3.8'
 
+# ==============================================================================
+# Easypanel 최적화 Redmine Stack
+# - Traefik 프록시 자동 연동
+# - Secret 관리는 Easypanel UI 사용
+# - Volume 자동 백업 지원
+# ==============================================================================
+
 services:
-  # ======================================
-  # PostgreSQL 18.1 (한글 최적화)
-  # ======================================
+  # ----------------------------------------------------------------------------
+  # PostgreSQL 18.1 (공식 이미지 + 한글 로케일)
+  # ----------------------------------------------------------------------------
   db:
-    image: postgres:18.1-alpine  # alpine으로 경량화
-    container_name: redmine-db
+    image: postgres:18.1
+    container_name: redmine-postgres
+    
     environment:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # ICU 로케일 강제 적용
+      - POSTGRES_PASSWORD=${DB_PASSWORD}  # Easypanel Secret에서 주입
+      # ICU 로케일 설정 (한글 정렬 최적화)
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko-KR --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
       - TZ=Asia/Seoul
     
-    command: >
-      postgres
-      -c shared_buffers=512MB
-      -c effective_cache_size=1GB
-      -c work_mem=16MB
-      -c maintenance_work_mem=128MB
-      -c max_connections=100
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
-      -c default_statistics_target=100
-      -c random_page_cost=1.1
-      -c effective_io_concurrency=200
-      -c min_wal_size=1GB
-      -c max_wal_size=4GB
-      -c max_worker_processes=4
-      -c max_parallel_workers_per_gather=2
-      -c max_parallel_workers=4
-      -c log_destination=stderr
-      -c logging_collector=off
-      -c log_statement=mod
-      -c log_min_duration_statement=1000
+    # PostgreSQL 성능 튜닝 (1GB 메모리 기준)
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=100
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - wal_buffers=8MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - min_wal_size=512MB
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - log_statement=mod
+      - -c
+      - log_min_duration_statement=1000
+      - -c
+      - logging_collector=off
     
     volumes:
-      - db_data:/var/lib/postgresql/data  # ★ 수정: /data 경로 명시
+      - db_data:/var/lib/postgresql/data
     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
@@ -52,55 +70,58 @@ services:
     deploy:
       resources:
         limits:
+          cpus: '1.0'
           memory: 1G
         reservations:
+          cpus: '0.5'
           memory: 512M
     
-    networks:
-      - redmine_net
+    labels:
+      - "easypanel.service.type=database"
+      - "easypanel.backup.enable=true"
 
-  # ======================================
+  # ----------------------------------------------------------------------------
   # Redmine 6.1.1 Application
-  # ======================================
+  # ----------------------------------------------------------------------------
   redmine:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - RUBY_VERSION=3.3
     
     container_name: redmine-app
     
     environment:
-      # [DB 연결]
+      # [데이터베이스 연결]
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
       - REDMINE_DB_USERNAME=redmine
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
-      - DB_POOL=10  # ★ 추가: Connection pool 설정
+      - DB_POOL=10
       
-      # [보안]
+      # [보안 키] Easypanel Secret 사용
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
       - SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
       
-      # [환경]
+      # [Rails 환경]
       - RAILS_ENV=production
       - RAILS_LOG_TO_STDOUT=1
-      - RAILS_SERVE_STATIC_FILES=1
+      - RAILS_SERVE_STATIC_FILES=true
       - TZ=Asia/Seoul
       
-      # [성능]
+      # [성능 튜닝]
       - RAILS_MAX_THREADS=5
       - WEB_CONCURRENCY=2
+      - MALLOC_ARENA_MAX=2
     
     volumes:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
       - redmine_logs:/usr/src/redmine/log
+      - redmine_tmp:/usr/src/redmine/tmp
     
     ports:
-      - "${REDMINE_PORT:-3000}:3000"
+      - "3000:3000"  # Easypanel이 Traefik으로 자동 프록시
     
     depends_on:
       db:
@@ -111,39 +132,53 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 90s  # 초기 구동 시간 여유
     
     restart: unless-stopped
     
     deploy:
       resources:
         limits:
+          cpus: '2.0'
           memory: 2G
         reservations:
+          cpus: '0.5'
           memory: 1G
     
-    networks:
-      - redmine_net
+    labels:
+      - "easypanel.service.type=web"
+      - "easypanel.domain=${REDMINE_DOMAIN:-redmine.example.com}"
+      - "easypanel.https=true"
+      - "easypanel.backup.enable=true"
 
-# ======================================
-# Volumes (명명 규칙 통일)
-# ======================================
+# ==============================================================================
+# Volumes (Easypanel 자동 관리 + 백업 지원)
+# ==============================================================================
 volumes:
   db_data:
     driver: local
+    labels:
+      - "easypanel.backup.schedule=daily"
+      - "easypanel.backup.retention=7"
+  
   redmine_files:
     driver: local
+    labels:
+      - "easypanel.backup.schedule=daily"
+      - "easypanel.backup.retention=7"
+  
   redmine_plugins:
     driver: local
+  
   redmine_themes:
     driver: local
+  
   redmine_logs:
     driver: local
+  
+  redmine_tmp:
+    driver: local
 
-# ======================================
-# Network (격리)
-# ======================================
-networks:
-  redmine_net:
-    name: redmine_production
-    driver: bridge
+# ==============================================================================
+# Network (Easypanel이 자동 생성하므로 명시 불필요)
+# ==============================================================================
