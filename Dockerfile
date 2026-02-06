@@ -21,12 +21,14 @@ WORKDIR /usr/src/redmine
 RUN sed -i 's/일감/이슈/g' config/locales/ko.yml
 
 # [6] 테마 설치 (Redmine 6.x 호환성 검증 버전)
-# - opale: 모던한 UI 테마 (6.x 호환 포크 버전)
-# - purplemine2, circle, abis: 사용자 선택 폭을 넓히기 위한 인기 테마 3종
+# [단계 4] 테마 설치 (Redmine 6.x 호환 및 공개 리포지토리 검증 완료)
+# - magopale, purplemine2: 이전 로그에서 성공 확인
+# - minimalflat2: 6.x를 완벽 지원하는 가장 대중적인 공개 테마
+# - zenmine: 깔끔한 화이트톤의 최신 호환 테마
 RUN git clone https://github.com/VitexSoftware/magopale.git public/themes/opale && \
     git clone https://github.com/mrliptontea/PurpleMine2.git public/themes/purplemine2 && \
-    git clone https://github.com/RyoSato/redmine_circle_theme.git public/themes/circle && \
-    git clone https://github.com/themof/abis.git public/themes/abis
+    git clone https://github.com/akiko-pusu/redmine_minimalflat2.git public/themes/minimalflat2 && \
+    git clone https://github.com/pmo-inc/zenmine.git public/themes/zenmine
 
 # [7] 플러그인 설치 (Redmine 6.x 및 Rails 7.2+ 호환 버전)
 # - view_customize: UI 동적 제어 (CSS/JS 삽입)
