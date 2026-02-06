@@ -1,14 +1,12 @@
-version: '3.8'
-
 services:
-  # PostgreSQL (커스텀 빌드)
+  # ============================================================================
+  # PostgreSQL 18.1 (한글 로케일 완전 설치)
+  # ============================================================================
   db:
     build:
       context: .
       dockerfile: Dockerfile
-      target: database  # ★ Stage 지정
-    
-    container_name: redmine-postgres
+      target: database
     
     environment:
       - POSTGRES_USER=redmine
@@ -45,14 +43,14 @@ services:
         limits:
           memory: 1G
 
-  # Redmine (커스텀 빌드)
+  # ============================================================================
+  # Redmine 6.1.1 (한국어 완전 최적화)
+  # ============================================================================
   redmine:
     build:
       context: .
       dockerfile: Dockerfile
-      target: application  # ★ Stage 지정
-    
-    container_name: redmine-app
+      target: application
     
     environment:
       - REDMINE_DB_POSTGRES=db
@@ -80,8 +78,8 @@ services:
       - redmine_logs:/usr/src/redmine/log
       - redmine_tmp:/usr/src/redmine/tmp
     
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     
     depends_on:
       db:
