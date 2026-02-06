@@ -3,14 +3,14 @@ FROM redmine:6.1.1
 
 USER root
 
-# [2] 필수 패키지 및 모든 예쁜 폰트 설치
+# [2] 필수 패키지 및 폰트 설치 (fonts-nanum-coding 제거)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    locales locales-all tzdata fonts-nanum fonts-nanum-coding \
+    locales locales-all tzdata fonts-nanum \
     git curl unzip wget fontconfig build-essential libpq-dev nodejs npm \
     libyaml-dev pkg-config ghostscript \
     && rm -rf /var/lib/apt/lists/*
 
-# Pretendard & Gmarket Sans 설치 (UI 가독성 혁명)
+# Pretendard & Gmarket Sans 설치 (UI 디자인 최적화)
 RUN mkdir -p /usr/share/fonts/truetype/custom && \
     wget https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip && \
     unzip Pretendard-1.3.9.zip -d /usr/share/fonts/truetype/custom/Pretendard && \
@@ -22,16 +22,15 @@ ENV LANG=ko_KR.UTF-8 TZ=Asia/Seoul
 
 WORKDIR /usr/src/redmine
 
-# [3] ★ 용어 치환 자동화 (일감 -> 이슈)
-# 빌드 시점에 언어팩 파일을 직접 수정하여 백엔드 전체에 적용합니다.
+# [3] 용어 치환 자동화 (일감 -> 이슈)
 RUN sed -i 's/일감/이슈/g' config/locales/ko.yml
 
-# [4] 플러그인 설치 (안정 버전)
+# [4] 플러그인 설치
 RUN git clone --depth 1 https://github.com/onozaty/redmine-view-customize.git plugins/view_customize && \
     git clone --depth 1 https://github.com/eXolnet/redmine_wbs.git plugins/redmine_wbs && \
     git clone --depth 1 https://github.com/akiko-pusu/redmine_issue_templates.git plugins/redmine_issue_templates
 
-# [5] ★ UI 디자인 자동 주입 스크립트 생성
+# [5] UI 디자인 자동 주입 스크립트 생성
 RUN echo "if ViewCustomize.where(path_pattern: '.*').empty?; \
   ViewCustomize.create!( \
     path_pattern: '.*', \
