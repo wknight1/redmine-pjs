@@ -7,6 +7,7 @@ services:
     environment:
       - REDMINE_DB_POSTGRES=db
       - REDMINE_DB_DATABASE=redmine
+      - REDMINE_DB_USERNAME=redmine  # ★ 이 부분이 누락되어 접속 실패했습니다.
       - REDMINE_DB_PASSWORD=${DB_PASSWORD}
       - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY}
       - TZ=Asia/Seoul
@@ -14,10 +15,6 @@ services:
       - redmine_files:/usr/src/redmine/files
       - redmine_plugins:/usr/src/redmine/plugins
       - redmine_themes:/usr/src/redmine/public/themes
-    # [KBS 프로덕션 파이프라인]
-    # 1. 플러그인 DB 마이그레이션
-    # 2. UI/UX 디자인 자동 주입
-    # 3. 웹 서버(Puma) 기동
     command: >
       sh -c "/docker-entrypoint.sh bundle exec rake redmine:plugins:migrate RAILS_ENV=production && 
              bundle exec rails runner /usr/src/redmine/init_ui.rb -e production &&
@@ -40,9 +37,8 @@ services:
       - POSTGRES_USER=redmine
       - POSTGRES_DB=redmine
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      # [ICU 로케일 적용] 한글 정렬 및 검색 최적화
+      # [성공 확인됨] 한글 로케일 적용 완료
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale-provider=icu --icu-locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
-    # [DB 성능 튜닝] KBS 디지털서비스부 규모에 맞춘 메모리 설정
     command: >
       postgres 
       -c shared_buffers=512MB 
