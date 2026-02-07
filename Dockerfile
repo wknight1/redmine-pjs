@@ -238,8 +238,21 @@ RUBY
 # - files: 첨부 파일 저장소
 # - public/plugin_assets: 플러그인 정적 파일
 # ==============================================================================
-RUN mkdir -p tmp/cache tmp/pids log files public/plugin_assets /home/redmine/.bundle && \
-    chown -R redmine:redmine /usr/src/redmine /usr/local/bundle /home/redmine
+RUN mkdir -p tmp/cache tmp/pids log files public/plugin_assets /home/redmine/.bundle
+
+# ==============================================================================
+# Asset 사전 컴파일 (빌드 타임)
+# ==============================================================================
+RUN SECRET_KEY_BASE=dummy \
+    DATABASE_URL=nulldb://localhost/redmine \
+    RAILS_ENV=production \
+    bundle exec rake assets:precompile 2>&1 | grep -E '(Writing|Compiling)' | tail -20
+
+# ==============================================================================
+# 최종 권한 설정
+# ==============================================================================
+RUN chown -R redmine:redmine /usr/src/redmine /usr/local/bundle /home/redmine
+
 
 # ==============================================================================
 # 프로덕션 Entrypoint 스크립트 (완전 자동화)
@@ -339,14 +352,14 @@ fi
 # ==========================================
 # [7/8] Asset 컴파일
 # ==========================================
-echo "[7/8] Asset 컴파일..."
-if [ ! -d public/assets ] || [ -z "$(ls -A public/assets 2>/dev/null)" ]; then
-  # DB 연결 없이 Asset 컴파일 (환경변수 임시 변경)
-  DATABASE_URL="" bundle exec rake assets:precompile RAILS_ENV=production 2>&1 | grep -v "yarn" || true
-  echo "   ✅ Asset 컴파일 완료"
+echo "[7/8] Asset 확인..."
+if [ -d public/assets ] && [ -n "$(ls -A public/assets 2>/dev/null)" ]; then
+  echo "   ✅ Asset 이미 컴파일됨 ($(ls public/assets | wc -l)개 파일)"
 else
-  echo "   ✅ Asset 존재 (스킵)"
+  echo "   ⚠️  Asset 재컴파일..."
+  bundle exec rake assets:precompile RAILS_ENV=production 2>&1 | tail -10 || true
 fi
+
 
 
 # ==========================================
