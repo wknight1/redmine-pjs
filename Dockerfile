@@ -157,12 +157,14 @@ RUN bundle config set --local without 'development test' && \
     bundle install
 
 # ==============================================================================
-# Rake 태스크: 한국어 UI 자동 설정
+# Rake 태스크: 한국어 UI 자동 설정 (오타 수정 버전)
 # ==============================================================================
 # 초기 부팅 시 View Customize 플러그인을 통해 한글 폰트 적용
 # - Pretendard: 본문 폰트
 # - D2Coding: 코드 폰트
 # - 기타 UI 개선 (버튼 라운드, 가독성)
+#
+# ⚠️ 중요: customization_type (언더스코어) 사용
 # ==============================================================================
 RUN mkdir -p lib/tasks && cat > lib/tasks/korean_setup.rake <<'RUBY'
 namespace :redmine do
@@ -181,24 +183,24 @@ namespace :redmine do
               letter-spacing: -0.02em;
               word-break: keep-all;
             }
-            
+
             /* 코드 폰트 */
             pre, code, .CodeMirror, tt, .wiki pre {
               font-family: 'D2Coding', 'Consolas', 'Monaco', monospace !important;
             }
-            
+
             /* 가독성 개선 */
             body { font-size: 14px; line-height: 1.6; }
             h1, h2, h3, h4, h5, h6 { font-weight: 600; }
-            
+
             /* 버튼 스타일 */
             .button, input[type="button"], input[type="submit"] {
               border-radius: 4px;
               transition: all 0.2s;
             }
           CSS
-          
-          # ViewCustomize 레코드 생성
+
+          # ViewCustomize 레코드 생성 (올바른 컬럼명 사용)
           ViewCustomize.create!(
             path_pattern: '.*',
             customization_type: 'style',
@@ -213,14 +215,15 @@ namespace :redmine do
       else
         puts "⚠️  ViewCustomize 플러그인 미설치 또는 테이블 미생성"
       end
-      
+
       # Redmine 기본 설정
       Setting.default_language = 'ko' rescue nil  # 기본 언어: 한국어
       Setting.ui_theme = 'PurpleMine2' rescue nil # 기본 테마: PurpleMine2
-      
+
       puts "✅ 한국어 기본 설정 완료"
     rescue => e
       puts "⚠️  설정 중 오류: #{e.message}"
+      puts "    (무시해도 Redmine은 정상 작동합니다)"
     end
   end
 end
@@ -281,12 +284,12 @@ if [ ! -f config/database.yml ]; then
   cat > config/database.yml <<EOF
 production:
   adapter: postgresql
-  database: ${REDMINE_DB_DATABASE}
-  host: ${REDMINE_DB_POSTGRES}
-  username: ${REDMINE_DB_USERNAME}
-  password: ${REDMINE_DB_PASSWORD}
+  database: \${REDMINE_DB_DATABASE}
+  host: \${REDMINE_DB_POSTGRES}
+  username: \${REDMINE_DB_USERNAME}
+  password: \${REDMINE_DB_PASSWORD}
   encoding: utf8
-  pool: ${DB_POOL:-20}
+  pool: \${DB_POOL:-20}
 EOF
   echo "   ✅ database.yml 생성"
 else
@@ -337,7 +340,7 @@ fi
 # [7/8] Asset 컴파일
 # ==========================================
 echo "[7/8] Asset 컴파일..."
-if [ ! -d public/assets ] || [ -z "$(ls -A public/assets 2>/dev/null)" ]; then
+if [ ! -d public/assets ] || [ -z "\$(ls -A public/assets 2>/dev/null)" ]; then
   bundle exec rake assets:precompile RAILS_ENV=production 2>&1 | grep -v "yarn" || true
   echo "   ✅ Asset 컴파일 완료"
 else
@@ -386,7 +389,7 @@ RUN chmod +x /docker-entrypoint.sh
 # ==============================================================================
 RUN cat > /healthcheck.sh <<'BASH'
 #!/bin/bash
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login)
+HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login)
 [ "$HTTP_CODE" = "200" ] && exit 0 || exit 1
 BASH
 
@@ -406,5 +409,5 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 # Logs:  docker-compose logs -f redmine
 #
 # 작성: 2026-02-08
-# 버전: 1.0.0
+# 버전: 1.0.1 (customization_type 오타 수정)
 # ==============================================================================
