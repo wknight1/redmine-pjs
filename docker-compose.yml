@@ -198,7 +198,7 @@ networks:
 
   proxy:
     external: true
-    name: ${PROXY_NETWORK:?Set PROXY_NETWORK to Easypanel overlay network name}
+    name: ${PROXY_NETWORK:-easypanel-digitalservice}
 
 # ==============================================================================
 # 퍼시스턴트 볼륨
