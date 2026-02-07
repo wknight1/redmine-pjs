@@ -137,8 +137,8 @@ services:
       REDMINE_LANG: ko
       
       # Rails 성능 튜닝
-      RAILS_MAX_THREADS: "2"                 # 스레드 수
-      WEB_CONCURRENCY: "1"                   # 워커 프로세스 수
+      RAILS_MAX_THREADS: "3"                 # 스레드 수
+      WEB_CONCURRENCY: "2"                   # 워커 프로세스 수
       
       # Ruby 메모리 최적화
       MALLOC_ARENA_MAX: "2"                  # 메모리 단편화 방지
@@ -157,7 +157,7 @@ services:
     
     # Traefik이 자동으로 라우팅하도록 포트 노출 (외부 바인딩 없음)
     expose:
-      - "3000"
+      - "3000:3333"
     
     # DB가 정상 작동할 때까지 대기
     depends_on:
@@ -183,7 +183,7 @@ services:
     
     networks:
       - redmine_network
-      - proxy
+      # - proxy
 
 # ==============================================================================
 # 네트워크 설정
@@ -196,9 +196,9 @@ networks:
     driver: bridge
     name: redmine_network
 
-  proxy:
-    external: true
-    name: easypanel-digitalservice
+  # proxy:
+  #   external: true
+  #   name: easypanel-digitalservice
 
 # ==============================================================================
 # 퍼시스턴트 볼륨
