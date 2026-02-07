@@ -340,12 +340,14 @@ fi
 # [7/8] Asset 컴파일
 # ==========================================
 echo "[7/8] Asset 컴파일..."
-if [ ! -d public/assets ] || [ -z "\$(ls -A public/assets 2>/dev/null)" ]; then
-  bundle exec rake assets:precompile RAILS_ENV=production 2>&1 | grep -v "yarn" || true
+if [ ! -d public/assets ] || [ -z "$(ls -A public/assets 2>/dev/null)" ]; then
+  # DB 연결 없이 Asset 컴파일 (환경변수 임시 변경)
+  DATABASE_URL="" bundle exec rake assets:precompile RAILS_ENV=production 2>&1 | grep -v "yarn" || true
   echo "   ✅ Asset 컴파일 완료"
 else
   echo "   ✅ Asset 존재 (스킵)"
 fi
+
 
 # ==========================================
 # [8/8] 한국어 설정
