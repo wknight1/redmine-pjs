@@ -1,6 +1,6 @@
 services:
   # ============================================================================
-  # PostgreSQL 18.1 (한글 로케일 + 성능 튜닝)
+  # PostgreSQL 18.1 (한글 로케일 + 새 볼륨 구조)
   # ============================================================================
   db:
     build:
@@ -47,7 +47,7 @@ services:
       - "log_min_duration_statement=1000"
     
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql
     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
