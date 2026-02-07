@@ -297,12 +297,12 @@ if [ ! -f config/database.yml ]; then
   cat > config/database.yml <<EOF
 production:
   adapter: postgresql
-  database: \${REDMINE_DB_DATABASE}
-  host: \${REDMINE_DB_POSTGRES}
-  username: \${REDMINE_DB_USERNAME}
-  password: \${REDMINE_DB_PASSWORD}
+  database: ${REDMINE_DB_DATABASE}
+  host: ${REDMINE_DB_POSTGRES}
+  username: ${REDMINE_DB_USERNAME}
+  password: ${REDMINE_DB_PASSWORD}
   encoding: utf8
-  pool: \${DB_POOL:-20}
+  pool: ${DB_POOL:-20}
 EOF
   echo "   ✅ database.yml 생성"
 else
