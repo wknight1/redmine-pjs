@@ -9,58 +9,45 @@ services:
       target: database
     
     environment:
-      - POSTGRES_USER=redmine
-      - POSTGRES_DB=redmine
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - TZ=Asia/Seoul
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8
+      POSTGRES_USER: redmine
+      POSTGRES_DB: redmine
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8"
     
     command:
-      - postgres
-      - -c
-      - shared_buffers=512MB
-      - -c
-      - max_connections=200
-      - -c
-      - effective_cache_size=1GB
-      - -c
-      - maintenance_work_mem=128MB
-      - -c
-      - checkpoint_completion_target=0.9
-      - -c
-      - wal_buffers=16MB
-      - -c
-      - default_statistics_target=100
-      - -c
-      - random_page_cost=1.1
-      - -c
-      - effective_io_concurrency=200
-      - -c
-      - work_mem=5242kB
-      - -c
-      - min_wal_size=1GB
-      - -c
-      - max_wal_size=4GB
-      - -c
-      - log_statement=mod
-      - -c
-      - log_min_duration_statement=1000
-      - -c
-      - log_line_prefix=%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h
-      - -c
-      - logging_collector=on
-      - -c
-      - log_directory=pg_log
-      - -c
-      - log_filename=postgresql-%Y-%m-%d.log
-      - -c
-      - log_rotation_age=1d
-      - -c
-      - log_rotation_size=100MB
+      - "postgres"
+      - "-c"
+      - "shared_buffers=512MB"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "default_statistics_target=100"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "work_mem=5242kB"
+      - "-c"
+      - "min_wal_size=1GB"
+      - "-c"
+      - "max_wal_size=4GB"
+      - "-c"
+      - "log_statement=mod"
+      - "-c"
+      - "log_min_duration_statement=1000"
     
     volumes:
       - db_data:/var/lib/postgresql/data
-      - db_logs:/var/lib/postgresql/pg_log
     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
@@ -93,28 +80,27 @@ services:
       target: application
     
     environment:
-      - REDMINE_DB_POSTGRES=db
-      - REDMINE_DB_DATABASE=redmine
-      - REDMINE_DB_USERNAME=redmine
-      - REDMINE_DB_PASSWORD=${DB_PASSWORD}
-      - REDMINE_DB_ENCODING=utf8
-      - DB_POOL=20
-      - REDMINE_SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
-      - SECRET_KEY_BASE=${REDMINE_SECRET_KEY_BASE}
-      - RAILS_ENV=production
-      - RAILS_LOG_TO_STDOUT=1
-      - RAILS_SERVE_STATIC_FILES=true
-      - LANG=ko_KR.UTF-8
-      - LC_ALL=ko_KR.UTF-8
-      - TZ=Asia/Seoul
-      - REDMINE_LANG=ko
-      - RAILS_MAX_THREADS=5
-      - WEB_CONCURRENCY=4
-      # 성능 최적화
-      - MALLOC_ARENA_MAX=2
-      - RUBY_GC_HEAP_GROWTH_FACTOR=1.1
-      - RUBY_GC_MALLOC_LIMIT=16000000
-      - RUBY_GC_OLDMALLOC_LIMIT=16000000
+      REDMINE_DB_POSTGRES: db
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: ${DB_PASSWORD}
+      REDMINE_DB_ENCODING: utf8
+      DB_POOL: "20"
+      REDMINE_SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE}
+      SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE}
+      RAILS_ENV: production
+      RAILS_LOG_TO_STDOUT: "1"
+      RAILS_SERVE_STATIC_FILES: "true"
+      LANG: ko_KR.UTF-8
+      LC_ALL: ko_KR.UTF-8
+      TZ: Asia/Seoul
+      REDMINE_LANG: ko
+      RAILS_MAX_THREADS: "5"
+      WEB_CONCURRENCY: "4"
+      MALLOC_ARENA_MAX: "2"
+      RUBY_GC_HEAP_GROWTH_FACTOR: "1.1"
+      RUBY_GC_MALLOC_LIMIT: "16000000"
+      RUBY_GC_OLDMALLOC_LIMIT: "16000000"
     
     volumes:
       - redmine_files:/usr/src/redmine/files
@@ -151,9 +137,6 @@ services:
     
     networks:
       - redmine_network
-    
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
 
 networks:
   redmine_network:
@@ -161,8 +144,6 @@ networks:
 
 volumes:
   db_data:
-    driver: local
-  db_logs:
     driver: local
   redmine_files:
     driver: local
