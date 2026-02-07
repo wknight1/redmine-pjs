@@ -8,7 +8,7 @@
           "type": "image",
           "image": "wknight1/redmine-pjs:latest"
         },
-        "env": "REDMINE_DB_POSTGRES=db\nREDMINE_DB_DATABASE=redmine\nREDMINE_DB_USERNAME=redmine\nREDMINE_DB_PASSWORD=\nREDMINE_DB_ENCODING=utf8\nDB_POOL=10\nREDMINE_DB_POOL=10\nREDMINE_SECRET_KEY_BASE=\nSECRET_KEY_BASE=\nRAILS_ENV=production\nRAILS_LOG_TO_STDOUT=1\nRAILS_SERVE_STATIC_FILES=true\nLANG=ko_KR.UTF-8\nLC_ALL=ko_KR.UTF-8\nTZ=Asia/Seoul\nREDMINE_LANG=ko\nRAILS_MAX_THREADS=5\nWEB_CONCURRENCY=1\nMALLOC_ARENA_MAX=2\nRUBY_GC_HEAP_GROWTH_FACTOR=1.1\nRUBY_GC_MALLOC_LIMIT=16000000\nRUBY_GC_OLDMALLOC_LIMIT=16000000",
+        "env": "REDMINE_DB_POSTGRES=redmine-db\nREDMINE_DB_DATABASE=redmine\nREDMINE_DB_USERNAME=redmine\nREDMINE_DB_PASSWORD=Hq3gxM/1E0voeb9sAWVCXz3LhEROaajnHt92A1tCWRw=\nREDMINE_DB_ENCODING=utf8\nDB_POOL=10\nREDMINE_DB_POOL=10\nREDMINE_SECRET_KEY_BASE=21c34378973b782e3855a0620eb0e7462bdad8566df1977d1fcd07249b1185500657f404c63a17ca4bd4e6b1cfdd15423d4606f585a7c877df667834c7ec9796\nSECRET_KEY_BASE=\nRAILS_ENV=production\nRAILS_LOG_TO_STDOUT=1\nRAILS_SERVE_STATIC_FILES=true\nLANG=ko_KR.UTF-8\nLC_ALL=ko_KR.UTF-8\nTZ=Asia/Seoul\nREDMINE_LANG=ko\nRAILS_MAX_THREADS=5\nWEB_CONCURRENCY=1\nMALLOC_ARENA_MAX=2\nRUBY_GC_HEAP_GROWTH_FACTOR=1.1\nRUBY_GC_MALLOC_LIMIT=16000000\nRUBY_GC_OLDMALLOC_LIMIT=16000000",
         "volumes": [
           { "type": "volume", "name": "redmine_files", "mountPath": "/usr/src/redmine/files" },
           { "type": "volume", "name": "redmine_plugins", "mountPath": "/usr/src/redmine/plugins" },
@@ -22,17 +22,17 @@
     {
       "type": "app",
       "data": {
-        "serviceName": "db",
+        "serviceName": "redmine-db",
         "source": {
           "type": "image",
           "image": "wknight1/redmine-pjs-postgres:latest"
         },
-        "env": "POSTGRES_USER=redmine\nPOSTGRES_DB=redmine\nPOSTGRES_PASSWORD=\nTZ=Asia/Seoul\nPOSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8",
+        "env": "POSTGRES_USER=redmine\nPOSTGRES_DB=redmine\nPOSTGRES_PASSWORD=Hq3gxM/1E0voeb9sAWVCXz3LhEROaajnHt92A1tCWRw=\nTZ=Asia/Seoul\nPOSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8",
         "volumes": [
           { "type": "volume", "name": "db_data", "mountPath": "/var/lib/postgresql" }
         ],
         "deploy": {
-          "command": "postgres -c shared_buffers=512MB -c max_connections=100 -c effective_cache_size=2GB -c maintenance_work_mem=256MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c default_statistics_target=100 -c random_page_cost=1.1 -c effective_io_concurrency=100 -c work_mem=8MB -c min_wal_size=1GB -c max_wal_size=4GB -c log_statement=mod -c log_min_duration_statement=1000"
+            "command": "gosu postgres postgres -c shared_buffers=512MB -c max_connections=100 -c effective_cache_size=2GB -c maintenance_work_mem=256MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c default_statistics_target=100 -c random_page_cost=1.1 -c effective_io_concurrency=100 -c work_mem=8MB -c min_wal_size=1GB -c max_wal_size=4GB -c log_statement=mod -c log_min_duration_statement=1000"
         }
       }
     }

@@ -1,0 +1,174 @@
+# syntax=docker/dockerfile:1
+###############################################################################
+# PostgreSQL 18.1 + 한국어(ko_KR.UTF-8) + MeCab(한국어 형태소) + textsearch_ko
+#
+# 목표
+# - amd64/arm64 멀티플랫폼 빌드 안정화
+# - (문제1) 구버전 config.guess/config.sub로 aarch64 인식 실패 → 최신본으로 교체
+# - (문제2) git.savannah.gnu.org 접속 실패(빌드 환경 방화벽/장애) → 로컬 파일 우선 사용
+# - (문제3) mecab-ko-dic에서 aclocal-1.11/automake-1.11 호출 → 링크/변수로 우회
+#
+# 참고
+# - /docker-entrypoint-initdb.d/*.sql 은 "최초 initdb" 때만 실행됩니다.
+###############################################################################
+
+FROM postgres:18.1
+
+USER root
+
+###############################################################################
+# 1) 필수 패키지 설치
+###############################################################################
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # 기본 유틸
+    ca-certificates curl git tzdata \
+    # 로케일
+    locales \
+    # 빌드툴(autotools 포함)
+    build-essential pkg-config gawk \
+    autoconf automake libtool perl \
+    # 최신 config.guess/config.sub 를 로컬에서 제공(외부망 의존 제거)
+    autotools-dev \
+    # textsearch_ko 빌드용(확장 모듈 컴파일)
+    postgresql-server-dev-18 \
+ && rm -rf /var/lib/apt/lists/*
+
+###############################################################################
+# 2) 로케일/타임존 설정
+###############################################################################
+RUN sed -i '/ko_KR.UTF-8/s/^# //g' /etc/locale.gen \
+ && locale-gen ko_KR.UTF-8
+
+ENV LANG=ko_KR.UTF-8 \
+    LC_ALL=ko_KR.UTF-8 \
+    TZ=Asia/Seoul
+
+###############################################################################
+# 3) 오래된 autotools가 기대하는 바이너리명(1.11) 우회
+###############################################################################
+RUN ln -sf /usr/bin/aclocal  /usr/local/bin/aclocal-1.11 \
+ && ln -sf /usr/bin/automake /usr/local/bin/automake-1.11
+
+###############################################################################
+# 4) MeCab-ko / mecab-ko-dic 빌드
+###############################################################################
+ARG MECAB_VER=0.996-ko-0.9.2
+ARG MECAB_DIC_VER=2.1.1-20180720
+
+# 공통 함수:
+# - 최신 config.guess/config.sub 확보(외부망 없이 /usr/share/misc 우선)
+# - 없으면 automake 경로에서 찾고,
+# - 그래도 없으면 GitHub raw로 마지막 폴백(네트워크가 되는 환경만)
+RUN set -eux; \
+  install_gnu_config() { \
+    tgt_dir="$1"; \
+    mkdir -p "$tgt_dir"; \
+    for f in config.guess config.sub; do \
+      if [ -r "/usr/share/misc/$f" ]; then \
+        cp -f "/usr/share/misc/$f" "$tgt_dir/$f"; \
+        continue; \
+      fi; \
+      amdir="$(ls -1d /usr/share/automake-* 2>/dev/null | sort -V | tail -1 || true)"; \
+      if [ -n "${amdir:-}" ] && [ -r "$amdir/$f" ]; then \
+        cp -f "$amdir/$f" "$tgt_dir/$f"; \
+        continue; \
+      fi; \
+      # 최후 폴백: GitHub raw (사내망/방화벽이면 실패할 수 있음)
+      curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
+        -o "$tgt_dir/$f" "https://raw.githubusercontent.com/gcc-mirror/gcc/master/$f"; \
+    done; \
+    chmod +x "$tgt_dir/config.guess" || true; \
+  }; \
+  install_gnu_config /opt/gnu-config
+
+# MeCab-ko
+RUN set -eux; \
+  mkdir -p /opt/src /opt/mecab-ko; \
+  cd /opt/src; \
+  curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 180 \
+    -o mecab.tar.gz "https://bitbucket.org/eunjeon/mecab-ko/downloads/mecab-${MECAB_VER}.tar.gz"; \
+  tar -xzf mecab.tar.gz; \
+  cd "mecab-${MECAB_VER}"; \
+  # 최신 config.*로 교체(아키텍처 인식 안정화)
+  cp -f /opt/gnu-config/config.guess ./config.guess; \
+  cp -f /opt/gnu-config/config.sub   ./config.sub; \
+  chmod +x ./config.guess; \
+  ./configure --build="$(./config.guess)" --prefix=/opt/mecab-ko; \
+  make -j"$(nproc)"; \
+  make install
+
+# mecab-ko-dic
+RUN set -eux; \
+  cd /opt/src; \
+  curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 180 \
+    -o mecab-dic.tar.gz "https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-${MECAB_DIC_VER}.tar.gz"; \
+  tar -xzf mecab-dic.tar.gz; \
+  cd "mecab-ko-dic-${MECAB_DIC_VER}"; \
+  # 최신 config.*로 교체
+  cp -f /opt/gnu-config/config.guess ./config.guess; \
+  cp -f /opt/gnu-config/config.sub   ./config.sub; \
+  chmod +x ./config.guess; \
+  # 구버전 autotools 이름 호출을 최소화(안전장치)
+  ACLOCAL=aclocal AUTOMAKE=automake \
+    ./configure --build="$(./config.guess)" \
+      --prefix=/opt/mecab-ko \
+      --with-mecab-config=/opt/mecab-ko/bin/mecab-config; \
+  make -j"$(nproc)"; \
+  make install; \
+  rm -rf /opt/src/*
+
+# 런타임 설정(라이브러리/사전 경로)
+RUN set -eux; \
+  echo "/opt/mecab-ko/lib" > /etc/ld.so.conf.d/mecab-ko.conf; \
+  ldconfig; \
+  mkdir -p /opt/mecab-ko/etc; \
+  echo "dicdir = /opt/mecab-ko/lib/mecab/dic/mecab-ko-dic" > /opt/mecab-ko/etc/mecabrc
+
+ENV PATH="/opt/mecab-ko/bin:${PATH}" \
+    MECABRC="/opt/mecab-ko/etc/mecabrc" \
+    MECAB_CONFIG="/opt/mecab-ko/bin/mecab-config" \
+    LD_LIBRARY_PATH="/opt/mecab-ko/lib"
+
+###############################################################################
+# 5) textsearch_ko (한국어 형태소 기반 FTS) 설치
+###############################################################################
+RUN set -eux; \
+  cd /tmp; \
+  git clone --depth 1 https://github.com/i0seph/textsearch_ko.git; \
+  cd textsearch_ko; \
+  make USE_PGXS=1 install; \
+  cd /tmp; \
+  rm -rf textsearch_ko
+
+###############################################################################
+# 6) initdb 시점에 확장/기본 설정 적용
+###############################################################################
+RUN set -eux; \
+  mkdir -p /docker-entrypoint-initdb.d; \
+  cat > /docker-entrypoint-initdb.d/10-korean-search.sql <<'SQL'
+-- trigram(부분문자열/유사도 검색) 확장
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- 한국어 형태소 기반 FTS 확장
+CREATE EXTENSION IF NOT EXISTS textsearch_ko;
+
+-- DB 기본 전문검색 설정을 korean으로 지정
+ALTER DATABASE :"POSTGRES_DB" SET default_text_search_config = 'korean';
+SQL
+
+###############################################################################
+# 7) initdb 인증/로케일 옵션(운영 권장)
+###############################################################################
+ENV POSTGRES_INITDB_ARGS="--encoding=UTF-8 --locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8 --auth-host=scram-sha-256 --auth-local=scram-sha-256"
+
+###############################################################################
+# 8) 이미지 사이즈 최적화(선택이지만 권장)
+#    - 빌드에만 필요했던 패키지를 제거(런타임에는 확장 .so만 남음)
+###############################################################################
+RUN apt-get purge -y --auto-remove \
+    build-essential pkg-config gawk \
+    autoconf automake libtool perl autotools-dev \
+    postgresql-server-dev-18 \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+USER postgres
