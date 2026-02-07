@@ -180,7 +180,6 @@ services:
         limits:
           cpus: '4'
           memory: 4G
-        reservations:
           cpus: '1'
           memory: 1G
     
