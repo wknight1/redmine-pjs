@@ -117,7 +117,9 @@ services:
       REDMINE_DB_USERNAME: redmine
       REDMINE_DB_PASSWORD: ${DB_PASSWORD}
       REDMINE_DB_ENCODING: utf8
-      DB_POOL: "20"                          # 커넥션 풀 크기
+      DB_POOL: "100"                          # 커넥션 풀 크기
+      # database.yml에 직접 반영되도록 추가
+      REDMINE_DB_POOL: "100"
       
       # 보안 키 (반드시 .env에서 설정)
       REDMINE_SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE}
@@ -135,8 +137,8 @@ services:
       REDMINE_LANG: ko
       
       # Rails 성능 튜닝
-      RAILS_MAX_THREADS: "5"                 # 스레드 수
-      WEB_CONCURRENCY: "4"                   # 워커 프로세스 수
+      RAILS_MAX_THREADS: "2"                 # 스레드 수
+      WEB_CONCURRENCY: "1"                   # 워커 프로세스 수
       
       # Ruby 메모리 최적화
       MALLOC_ARENA_MAX: "2"                  # 메모리 단편화 방지
@@ -215,8 +217,8 @@ volumes:
     driver: local
   redmine_tmp:          # 임시 파일 (성능 향상)
     driver: local
-  redmine_assets:       # 컴파일된 에셋 (재빌드 시 재생성 방지)
-    driver: local
+  # redmine_assets:       # 컴파일된 에셋 (재빌드 시 재생성 방지)
+  #   driver: local
 
 # ==============================================================================
 # 사용 방법
