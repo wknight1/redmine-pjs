@@ -214,8 +214,8 @@ volumes:
     driver: local
   redmine_tmp:          # 임시 파일 (성능 향상)
     driver: local
-  # redmine_assets:       # 컴파일된 에셋 (재빌드 시 재생성 방지)
-  #   driver: local
+  redmine_assets:       # 컴파일된 에셋 (재빌드 시 재생성 방지)
+    driver: local
 
 # ==============================================================================
 # 사용 방법
