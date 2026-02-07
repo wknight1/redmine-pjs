@@ -153,7 +153,7 @@ services:
       - redmine_themes:/usr/src/redmine/public/themes     # 테마
       - redmine_logs:/usr/src/redmine/log                 # 로그
       - redmine_tmp:/usr/src/redmine/tmp                  # 임시 파일
-      - redmine_assets:/usr/src/redmine/public/assets     # 컴파일된 에셋
+#      - redmine_assets:/usr/src/redmine/public/assets     # 컴파일된 에셋
     
     # Traefik이 자동으로 라우팅하도록 포트 노출 (외부 바인딩 없음)
     expose:
@@ -214,8 +214,8 @@ volumes:
     driver: local
   redmine_tmp:          # 임시 파일 (성능 향상)
     driver: local
-  # redmine_assets:       # 컴파일된 에셋 (재빌드 시 재생성 방지)
-  #   driver: local
+  redmine_assets:       # 컴파일된 에셋 (재빌드 시 재생성 방지)
+    driver: local
 
 # ==============================================================================
 # 사용 방법
