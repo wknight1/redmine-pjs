@@ -403,10 +403,10 @@ RUN chmod +x /docker-entrypoint.sh
 # Docker/Kubernetes 헬스체크에서 사용
 # ==============================================================================
 RUN cat > /healthcheck.sh <<'BASH'
-#!/bin/bash
-HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login)
+#!/bin/sh
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login)
 [ "$HTTP_CODE" = "200" ] && exit 0 || exit 1
-BASH
+
 
 RUN chmod +x /healthcheck.sh
 
