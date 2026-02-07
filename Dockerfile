@@ -402,13 +402,17 @@ RUN chmod +x /docker-entrypoint.sh
 # /login 페이지가 HTTP 200을 반환하는지 확인
 # Docker/Kubernetes 헬스체크에서 사용
 # ==============================================================================
-RUN cat > /healthcheck.sh <<'BASH'
+# ==============================================================================
+# 헬스체크 스크립트
+# ==============================================================================
+RUN cat > /healthcheck.sh <<'SH'
 #!/bin/sh
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login)
 [ "$HTTP_CODE" = "200" ] && exit 0 || exit 1
-
+SH
 
 RUN chmod +x /healthcheck.sh
+
 
 # 포트 노출 (Traefik이 내부적으로 라우팅)
 EXPOSE 3000
