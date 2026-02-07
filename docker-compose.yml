@@ -1,6 +1,25 @@
+# ==============================================================================
+# Redmine 6.1.1 Korean Edition - Easypanel 전용 구성
+# ==============================================================================
+# 
+# 특징:
+# - PostgreSQL 18.1 (한글 로케일 완벽 지원)
+# - Redmine 6.1.1 (한국어 최적화)
+# - PurpleMine2 테마 (Redmine 6 지원)
+# - 3개 필수 플러그인 (View Customize, WBS, Issue Templates)
+# - Pretendard + D2Coding 폰트
+# - Traefik 자동 라우팅 (Easypanel)
+# - 프로덕션 레벨 성능 튜닝
+#
+# ==============================================================================
+
 services:
   # ============================================================================
-  # PostgreSQL 18.1 (한글 로케일 + 새 볼륨 구조)
+  # PostgreSQL 18.1 데이터베이스
+  # ============================================================================
+  # - 한글 로케일 완벽 지원 (ko_KR.UTF-8)
+  # - PostgreSQL 18 새 볼륨 구조 적용 (/var/lib/postgresql)
+  # - 5~10명 동시 사용자 기준 성능 튜닝
   # ============================================================================
   db:
     build:
@@ -13,42 +32,47 @@ services:
       POSTGRES_DB: redmine
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       TZ: Asia/Seoul
+      # PostgreSQL 초기화 시 한글 로케일 설정
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=ko_KR.UTF-8 --lc-collate=ko_KR.UTF-8 --lc-ctype=ko_KR.UTF-8"
     
+    # PostgreSQL 성능 튜닝 (5~10명 동시 사용자 기준)
     command:
       - "postgres"
       - "-c"
-      - "shared_buffers=512MB"
+      - "shared_buffers=512MB"              # 메모리 캐시
       - "-c"
-      - "max_connections=200"
+      - "max_connections=200"               # 최대 연결 수
       - "-c"
-      - "effective_cache_size=1GB"
+      - "effective_cache_size=1GB"          # 디스크 캐시 힌트
       - "-c"
-      - "maintenance_work_mem=128MB"
+      - "maintenance_work_mem=128MB"        # 유지보수 작업 메모리
       - "-c"
-      - "checkpoint_completion_target=0.9"
+      - "checkpoint_completion_target=0.9"  # 체크포인트 성능
       - "-c"
-      - "wal_buffers=16MB"
+      - "wal_buffers=16MB"                  # WAL 버퍼
       - "-c"
-      - "default_statistics_target=100"
+      - "default_statistics_target=100"     # 통계 정확도
       - "-c"
-      - "random_page_cost=1.1"
+      - "random_page_cost=1.1"              # SSD 최적화
       - "-c"
-      - "effective_io_concurrency=200"
+      - "effective_io_concurrency=200"      # 병렬 I/O
       - "-c"
-      - "work_mem=5242kB"
+      - "work_mem=5242kB"                   # 정렬/해시 작업 메모리
       - "-c"
-      - "min_wal_size=1GB"
+      - "min_wal_size=1GB"                  # WAL 최소 크기
       - "-c"
-      - "max_wal_size=4GB"
+      - "max_wal_size=4GB"                  # WAL 최대 크기
       - "-c"
-      - "log_statement=mod"
+      - "log_statement=mod"                 # 데이터 변경만 로깅
       - "-c"
-      - "log_min_duration_statement=1000"
+      - "log_min_duration_statement=1000"   # 1초 이상 쿼리만 로깅
     
+    # PostgreSQL 18 새 볼륨 구조
+    # 실제 데이터는 /var/lib/postgresql/18/main에 자동 생성됨
     volumes:
       - db_data:/var/lib/postgresql
     
+    # 헬스체크: DB 준비 상태 확인
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U redmine -d redmine"]
       interval: 10s
@@ -58,6 +82,7 @@ services:
     
     restart: unless-stopped
     
+    # 리소스 제한
     deploy:
       resources:
         limits:
@@ -71,7 +96,13 @@ services:
       - redmine_network
 
   # ============================================================================
-  # Redmine 6.1.1 (한국어 최적화 + 프로덕션 강화)
+  # Redmine 6.1.1 애플리케이션
+  # ============================================================================
+  # - 한국어 UI 완벽 최적화
+  # - PurpleMine2 테마 내장
+  # - 3개 필수 플러그인 사전 설치
+  # - Pretendard + D2Coding 폰트
+  # - 프로덕션 레벨 Rails 설정
   # ============================================================================
   redmine:
     build:
@@ -80,52 +111,68 @@ services:
       target: application
     
     environment:
+      # 데이터베이스 연결 설정
       REDMINE_DB_POSTGRES: db
       REDMINE_DB_DATABASE: redmine
       REDMINE_DB_USERNAME: redmine
       REDMINE_DB_PASSWORD: ${DB_PASSWORD}
       REDMINE_DB_ENCODING: utf8
-      DB_POOL: "20"
+      DB_POOL: "20"                          # 커넥션 풀 크기
+      
+      # 보안 키 (반드시 .env에서 설정)
       REDMINE_SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE}
       SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE}
+      
+      # Rails 프로덕션 설정
       RAILS_ENV: production
-      RAILS_LOG_TO_STDOUT: "1"
-      RAILS_SERVE_STATIC_FILES: "true"
+      RAILS_LOG_TO_STDOUT: "1"               # 로그를 표준 출력으로
+      RAILS_SERVE_STATIC_FILES: "true"       # 정적 파일 직접 서빙
+      
+      # 한글 로케일 설정
       LANG: ko_KR.UTF-8
       LC_ALL: ko_KR.UTF-8
       TZ: Asia/Seoul
       REDMINE_LANG: ko
-      RAILS_MAX_THREADS: "5"
-      WEB_CONCURRENCY: "4"
-      MALLOC_ARENA_MAX: "2"
-      RUBY_GC_HEAP_GROWTH_FACTOR: "1.1"
-      RUBY_GC_MALLOC_LIMIT: "16000000"
-      RUBY_GC_OLDMALLOC_LIMIT: "16000000"
+      
+      # Rails 성능 튜닝
+      RAILS_MAX_THREADS: "5"                 # 스레드 수
+      WEB_CONCURRENCY: "4"                   # 워커 프로세스 수
+      
+      # Ruby 메모리 최적화
+      MALLOC_ARENA_MAX: "2"                  # 메모리 단편화 방지
+      RUBY_GC_HEAP_GROWTH_FACTOR: "1.1"      # GC 힙 증가율
+      RUBY_GC_MALLOC_LIMIT: "16000000"       # GC 트리거 임계값
+      RUBY_GC_OLDMALLOC_LIMIT: "16000000"    # Old 객체 GC 임계값
     
+    # 퍼시스턴트 볼륨 (데이터 영구 저장)
     volumes:
-      - redmine_files:/usr/src/redmine/files
-      - redmine_plugins:/usr/src/redmine/plugins
-      - redmine_themes:/usr/src/redmine/public/themes
-      - redmine_logs:/usr/src/redmine/log
-      - redmine_tmp:/usr/src/redmine/tmp
-      - redmine_assets:/usr/src/redmine/public/assets
+      - redmine_files:/usr/src/redmine/files              # 첨부 파일
+      - redmine_plugins:/usr/src/redmine/plugins          # 플러그인
+      - redmine_themes:/usr/src/redmine/public/themes     # 테마
+      - redmine_logs:/usr/src/redmine/log                 # 로그
+      - redmine_tmp:/usr/src/redmine/tmp                  # 임시 파일
+      - redmine_assets:/usr/src/redmine/public/assets     # 컴파일된 에셋
     
-    ports:
-      - "3000:3000"
+    # Traefik이 자동으로 라우팅하도록 포트 노출 (외부 바인딩 없음)
+    expose:
+      - "3000"
     
+    # DB가 정상 작동할 때까지 대기
     depends_on:
       db:
         condition: service_healthy
     
+    # 헬스체크: Redmine 웹 서버 준비 상태 확인
     healthcheck:
       test: ["CMD-SHELL", "/healthcheck.sh"]
       interval: 30s
       timeout: 15s
       retries: 5
-      start_period: 180s
+      start_period: 180s                     # 초기 시작 시간 (마이그레이션 포함)
     
     restart: unless-stopped
     
+    # 리소스 제한 (5~10명 동시 사용자 기준)
     deploy:
       resources:
         limits:
@@ -138,22 +185,88 @@ services:
     networks:
       - redmine_network
 
+# ==============================================================================
+# 네트워크 설정
+# ==============================================================================
+# - Redmine과 PostgreSQL 간 내부 통신용
+# - Traefik은 이 네트워크를 통해 Redmine에 접근
+# ==============================================================================
 networks:
   redmine_network:
     driver: bridge
+    name: redmine_network
 
+# ==============================================================================
+# 퍼시스턴트 볼륨
+# ==============================================================================
+# - 컨테이너 재시작/재빌드 시에도 데이터 유지
+# - 백업 시 이 볼륨들을 백업하면 됨
+# ==============================================================================
 volumes:
-  db_data:
+  db_data:              # PostgreSQL 데이터 (가장 중요!)
     driver: local
-  redmine_files:
+  redmine_files:        # 첨부 파일 (중요!)
     driver: local
-  redmine_plugins:
+  redmine_plugins:      # 플러그인 (재빌드 시 복원용)
     driver: local
-  redmine_themes:
+  redmine_themes:       # 테마 (재빌드 시 복원용)
     driver: local
-  redmine_logs:
+  redmine_logs:         # 로그 (디버깅용)
     driver: local
-  redmine_tmp:
+  redmine_tmp:          # 임시 파일 (성능 향상)
     driver: local
-  redmine_assets:
+  redmine_assets:       # 컴파일된 에셋 (재빌드 시 재생성 방지)
     driver: local
+
+# ==============================================================================
+# 사용 방법
+# ==============================================================================
+#
+# 1. .env 파일 생성:
+#    cat > .env <<EOF
+#    DB_PASSWORD=$(openssl rand -base64 32)
+#    REDMINE_SECRET_KEY_BASE=$(openssl rand -hex 64)
+#    EOF
+#
+# 2. 빌드 및 실행:
+#    docker-compose up --build -d
+#
+# 3. 로그 확인:
+#    docker-compose logs -f redmine
+#
+# 4. Easypanel에서 도메인 설정:
+#    - 프로젝트 > Redmine > Domains
+#    - 포트: 3000
+#    - SSL 자동 활성화
+#
+# 5. 초기 접속:
+#    - 계정: admin / admin
+#    - 관리 > 설정 > 표시
+#      - Theme: PurpleMine2
+#      - Default language: 한국어 (Korean)
+#
+# ==============================================================================
+# 백업 방법
+# ==============================================================================
+#
+# 1. 데이터베이스 백업:
+#    docker exec digitalservice_redmine-db-1 \
+#      pg_dump -U redmine redmine > redmine_backup_$(date +%Y%m%d).sql
+#
+# 2. 첨부 파일 백업:
+#    docker run --rm -v digitalservice_redmine_redmine_files:/data \
+#      -v $(pwd):/backup alpine tar czf /backup/files_$(date +%Y%m%d).tar.gz -C /data .
+#
+# ==============================================================================
+# 복원 방법
+# ==============================================================================
+#
+# 1. 데이터베이스 복원:
+#    cat redmine_backup_20260207.sql | \
+#      docker exec -i digitalservice_redmine-db-1 psql -U redmine redmine
+#
+# 2. 첨부 파일 복원:
+#    docker run --rm -v digitalservice_redmine_redmine_files:/data \
+#      -v $(pwd):/backup alpine tar xzf /backup/files_20260207.tar.gz -C /data
+#
+# ==============================================================================
