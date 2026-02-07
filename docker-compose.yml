@@ -183,6 +183,7 @@ services:
     
     networks:
       - redmine_network
+      - proxy
 
 # ==============================================================================
 # 네트워크 설정
@@ -194,6 +195,10 @@ networks:
   redmine_network:
     driver: bridge
     name: redmine_network
+
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-easypanel-traefik}
 
 # ==============================================================================
 # 퍼시스턴트 볼륨
