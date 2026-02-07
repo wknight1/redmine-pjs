@@ -156,7 +156,7 @@ services:
       - redmine_assets:/usr/src/redmine/public/assets     # 컴파일된 에셋
     
     # Traefik이 자동으로 라우팅하도록 포트 노출 (외부 바인딩 없음)
-    expose:
+    ports:
       - "3000:3333"
     
     # DB가 정상 작동할 때까지 대기
